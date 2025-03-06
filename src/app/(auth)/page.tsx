@@ -14,6 +14,21 @@ interface PostData {
   likes: string[];
   comments: any[];
   createdAt: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    altitude?: number;
+  };
+  deviceOrientation?: {
+    alpha: number;
+    beta: number;
+    gamma: number;
+  };
+  eventId?: string;
+  eventName?: string;
+  contextualTags?: string[];
+  captureTimestamp?: string;
 }
 
 export default function HomePage() {
@@ -52,7 +67,7 @@ export default function HomePage() {
       ) : posts.length > 0 ? (
         <div className="space-y-4">
           {posts.map((post) => (
-            <Post key={post.id} {...post} />
+            <Post key={post.id} post={post} />
           ))}
         </div>
       ) : (

@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { Play, Pause } from 'lucide-react';
 
-// Define the post data interface
+// Define the post location interface
 interface PostLocation {
   id: string;
   location: {
@@ -13,6 +14,7 @@ interface PostLocation {
   timestamp: string; // ISO timestamp
 }
 
+// Define the component props
 interface EventHeatmapProps {
   posts: PostLocation[];
   eventId: string;
@@ -25,51 +27,57 @@ interface EventHeatmapProps {
 export default function EventHeatmap({ posts, eventId, className = '' }: EventHeatmapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null);
-  const [timeIndex, setTimeIndex] = useState(0);
-  const [playing, setPlaying] = useState(false);
   const [timeRange, setTimeRange] = useState<[Date, Date]>([new Date(), new Date()]);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [timeIndex, setTimeIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
   const animationRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [processedPosts, setProcessedPosts] = useState<PostLocation[]>([]);
 
   // Process posts to create time-bucketed data
-  const processPostsData = () => {
-    if (!posts || posts.length === 0) return { timeBuckets: [], timeRange: [new Date(), new Date()] as [Date, Date] };
+  const processPostsData = useCallback(() => {
+    if (posts.length === 0) return { timeBuckets: [], timeRange: [new Date(), new Date()] };
 
     // Sort posts by timestamp
     const sortedPosts = [...posts].sort((a, b) => 
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
-
+    
+    setProcessedPosts(sortedPosts);
+    
     // Get time range
     const startTime = new Date(sortedPosts[0].timestamp);
     const endTime = new Date(sortedPosts[sortedPosts.length - 1].timestamp);
     
-    // Create 20 time buckets
-    const bucketSize = (endTime.getTime() - startTime.getTime()) / 20;
-    const buckets: PostLocation[][] = Array(20).fill(null).map(() => []);
+    // Create time buckets (for now, just use the sorted posts)
+    const buckets: PostLocation[][] = [];
+    const bucketCount = 10; // Number of time buckets
+    const timePerBucket = (endTime.getTime() - startTime.getTime()) / bucketCount;
+    
+    // Initialize buckets
+    for (let i = 0; i < bucketCount; i++) {
+      buckets.push([]);
+    }
     
     // Assign posts to buckets
     sortedPosts.forEach(post => {
       const postTime = new Date(post.timestamp).getTime();
       const bucketIndex = Math.min(
-        Math.floor((postTime - startTime.getTime()) / bucketSize),
-        19 // Ensure we don't exceed the array bounds
+        Math.floor((postTime - startTime.getTime()) / timePerBucket),
+        bucketCount - 1
       );
       buckets[bucketIndex].push(post);
     });
-    
-    setProcessedPosts(sortedPosts);
     
     return { 
       timeBuckets: buckets,
       timeRange: [startTime, endTime] as [Date, Date]
     };
-  };
+  }, [posts]);
 
   // Update the heatmap with new data
-  const updateHeatmap = (postsData: PostLocation[]) => {
+  const updateHeatmap = useCallback((postsData: PostLocation[]) => {
     if (!map.current || !mapLoaded) return;
 
     // Create GeoJSON data from posts
@@ -93,7 +101,7 @@ export default function EventHeatmap({ posts, eventId, className = '' }: EventHe
     if (source && 'setData' in source) {
       source.setData(geojsonData as any);
     }
-  };
+  }, [mapLoaded]);
 
   useEffect(() => {
     if (posts.length > 0) {
@@ -109,28 +117,31 @@ export default function EventHeatmap({ posts, eventId, className = '' }: EventHe
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [posts, processPostsData]);
+  }, [posts, processPostsData, updateHeatmap]);
 
   // Handle time slider change
   const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newIndex = parseInt(e.target.value, 10);
-    setTimeIndex(newIndex);
+    const value = parseInt(e.target.value);
+    setTimeIndex(value);
     
-    const { timeBuckets } = processPostsData();
-    if (timeBuckets.length > 0) {
-      updateHeatmap(timeBuckets[newIndex]);
-      
-      // Update current time display
-      const timeProgress = newIndex / (timeBuckets.length - 1);
-      const newTime = new Date(
-        timeRange[0].getTime() + 
-        timeProgress * (timeRange[1].getTime() - timeRange[0].getTime())
+    // Update the current time display
+    const timeProgress = value / 100;
+    const newTime = new Date(
+      timeRange[0].getTime() + 
+      (timeRange[1].getTime() - timeRange[0].getTime()) * timeProgress
+    );
+    setCurrentTime(newTime);
+    
+    // Update the heatmap
+    if (processedPosts.length > 0) {
+      const postsToShow = processedPosts.filter(post => 
+        new Date(post.timestamp).getTime() <= newTime.getTime()
       );
-      setCurrentTime(newTime);
+      updateHeatmap(postsToShow);
     }
   };
 
-  // Handle play/pause
+  // Toggle play/pause for the animation
   const togglePlay = () => {
     setPlaying(!playing);
   };
@@ -155,7 +166,7 @@ export default function EventHeatmap({ posts, eventId, className = '' }: EventHe
           const timeProgress = bucketIndex / (processedPosts.length - 1);
           const newTime = new Date(
             timeRange[0].getTime() + 
-            timeProgress * (timeRange[1].getTime() - timeRange[0].getTime())
+            (timeRange[1].getTime() - timeRange[0].getTime()) * timeProgress
           );
           setCurrentTime(newTime);
         }
@@ -177,50 +188,79 @@ export default function EventHeatmap({ posts, eventId, className = '' }: EventHe
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [playing, timeRange, mapLoaded, processedPosts, timeIndex]);
+  }, [playing, timeRange, mapLoaded, processedPosts, timeIndex, updateHeatmap]);
 
   // Format time for display
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
-
+  
   // Format date for display
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString();
   };
 
+  // If no posts with location data, show a message
+  if (posts.length === 0) {
+    return (
+      <div className={`bg-white rounded-lg shadow p-6 text-center ${className}`}>
+        <p className="text-gray-500">No location data available for this event.</p>
+        <p className="text-sm text-gray-400 mt-2">Add moments with location to see them on the map.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className={`flex flex-col ${className}`}>
-      <div ref={mapContainer} className="w-full h-64 md:h-96 rounded-lg" />
+    <div className={`bg-white rounded-lg shadow ${className}`}>
+      <div className="p-4 border-b">
+        <h3 className="text-lg font-semibold">Activity Heatmap</h3>
+        <p className="text-sm text-gray-500">
+          Visualize activity during the event
+        </p>
+      </div>
       
-      <div className="mt-4 px-2">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm text-gray-600">
-            {formatDate(currentTime)} {formatTime(currentTime)}
-          </span>
+      <div className="relative">
+        <div 
+          ref={mapContainer} 
+          className="w-full h-[400px]"
+        />
+        
+        {/* Loading indicator */}
+        {!mapLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-75">
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        )}
+      </div>
+      
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-2">
           <button 
             onClick={togglePlay}
-            className="bg-blue-600 text-white px-3 py-1 rounded-md text-sm"
+            className="p-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 transition"
+            disabled={!mapLoaded}
           >
-            {playing ? 'Pause' : 'Play'}
+            {playing ? <Pause size={16} /> : <Play size={16} />}
           </button>
+          
+          <div className="text-sm text-gray-600">
+            {formatDate(currentTime)} {formatTime(currentTime)}
+          </div>
         </div>
         
-        <div className="flex items-center space-x-2">
-          <span className="text-xs text-gray-500">{formatTime(timeRange[0])}</span>
-          <input
-            type="range"
-            min="0"
-            max="19"
-            value={timeIndex}
-            onChange={handleTimeChange}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-          />
-          <span className="text-xs text-gray-500">{formatTime(timeRange[1])}</span>
-        </div>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={timeIndex}
+          onChange={handleTimeChange}
+          className="w-full"
+          disabled={!mapLoaded}
+        />
         
-        <div className="mt-3 text-xs text-gray-500 text-center">
-          Showing post activity intensity over time
+        <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <span>{formatTime(timeRange[0])}</span>
+          <span>{formatTime(timeRange[1])}</span>
         </div>
       </div>
     </div>
