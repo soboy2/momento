@@ -36,6 +36,11 @@ interface EventData {
   }>;
 }
 
+// Type guard function to check if an object is an EventData
+function isEventData(obj: any): obj is EventData {
+  return obj && typeof obj === 'object' && 'name' in obj;
+}
+
 export default function CreatePostPage() {
   return (
     <AuthProvider>
@@ -391,7 +396,7 @@ function CreatePostContent() {
                   >
                     <div className="flex items-center">
                       <Calendar className="h-4 w-4 mr-2" />
-                      <span>{selectedEvent ? selectedEvent.name : 'Select an event (optional)'}</span>
+                      <span>{'Select an event (optional)'}</span>
                     </div>
                     <ChevronDown className="h-4 w-4" />
                   </button>
