@@ -1,52 +1,54 @@
 "use client";
 
 import React, { createContext, useEffect, useState } from "react";
-import { signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut } from "firebase/auth";
-import { User } from "firebase/auth";
-import { auth } from "../firebase/firebase";
+// Commenting out Firebase imports for now
+// import { signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut } from "firebase/auth";
+// import { User } from "firebase/auth";
+// import { auth } from "../firebase/firebase";
+
+// Mock User type
+interface MockUser {
+  uid: string;
+  displayName: string | null;
+  email: string | null;
+  photoURL: string | null;
+}
 
 interface AuthContextType {
-  user: User | null;
+  user: MockUser | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
+// Create a default mock user
+const defaultMockUser: MockUser = {
+  uid: 'mock-user-123',
+  displayName: 'Demo User',
+  email: 'demo@example.com',
+  photoURL: 'https://ui-avatars.com/api/?name=Demo+User&background=random&size=128',
+};
+
 const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
+  user: defaultMockUser,
+  loading: false,
   signInWithGoogle: async () => {},
   signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<MockUser | null>(defaultMockUser);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      setUser(user);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
+  // No need to check localStorage since we're always using the default user
+  
   const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Error signing in with Google", error);
-    }
+    setUser(defaultMockUser);
   };
 
   const signOutUser = async () => {
-    try {
-      await firebaseSignOut(auth);
-    } catch (error) {
-      console.error("Error signing out", error);
-    }
+    // Instead of signing out, just reset to the default user
+    setUser(defaultMockUser);
   };
 
   return (
