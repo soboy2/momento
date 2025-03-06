@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useEffect, useState } from "react";
+import Cookies from 'js-cookie';
 // Commenting out Firebase imports for now
 // import { signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut } from "firebase/auth";
 // import { User } from "firebase/auth";
@@ -37,18 +38,28 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<MockUser | null>(defaultMockUser);
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<MockUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // No need to check localStorage since we're always using the default user
+  // Check for auth cookie on initial load
+  useEffect(() => {
+    const authCookie = Cookies.get('auth');
+    if (authCookie) {
+      setUser(defaultMockUser);
+    }
+    setLoading(false);
+  }, []);
   
   const signInWithGoogle = async () => {
     setUser(defaultMockUser);
+    // Set auth cookie with 7 days expiry
+    Cookies.set('auth', 'authenticated', { expires: 7 });
   };
 
   const signOutUser = async () => {
-    // Instead of signing out, just reset to the default user
-    setUser(defaultMockUser);
+    // Remove auth cookie
+    Cookies.remove('auth');
+    setUser(null);
   };
 
   return (
