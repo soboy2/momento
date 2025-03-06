@@ -26,9 +26,25 @@ interface DeepgramContextProviderProps {
 }
 
 const getApiKey = async (): Promise<string> => {
-  const response = await fetch("/api/deepgram", { cache: "no-store" });
-  const result = await response.json();
-  return result.key;
+  try {
+    const response = await fetch("/api/deepgram", { cache: "no-store" });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to fetch Deepgram API key");
+    }
+    
+    const result = await response.json();
+    
+    if (!result.key) {
+      throw new Error("Deepgram API key not available");
+    }
+    
+    return result.key;
+  } catch (error) {
+    console.error("Error fetching Deepgram API key:", error);
+    throw error;
+  }
 };
 
 const DeepgramContextProvider: FunctionComponent<DeepgramContextProviderProps> = ({ children }) => {
@@ -42,10 +58,19 @@ const DeepgramContextProvider: FunctionComponent<DeepgramContextProviderProps> =
     try {
       setError(null);
       setRealtimeTranscript("");
+      
+      // Get user media stream
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioRef.current = new MediaRecorder(stream);
 
-      const apiKey = await getApiKey();
+      // Get API key
+      let apiKey;
+      try {
+        apiKey = await getApiKey();
+      } catch (error) {
+        setError(error instanceof Error ? error.message : "Failed to get Deepgram API key");
+        return;
+      }
 
       console.log("Opening WebSocket connection...");
       const socket = new WebSocket("wss://api.deepgram.com/v1/listen", ["token", apiKey]);

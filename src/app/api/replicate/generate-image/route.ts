@@ -7,14 +7,22 @@ const replicate = new Replicate({
 
 export async function POST(request: Request) {
   if (!process.env.REPLICATE_API_TOKEN) {
-    throw new Error(
-      "The REPLICATE_API_TOKEN environment variable is not set. See README.md for instructions on how to set it."
+    return NextResponse.json(
+      { error: "Replicate API token not configured" },
+      { status: 501 }
     );
   }
 
-  const { prompt } = await request.json();
-
   try {
+    const { prompt } = await request.json();
+
+    if (!prompt) {
+      return NextResponse.json(
+        { error: "Prompt is required" },
+        { status: 400 }
+      );
+    }
+
     const output = await replicate.run(
       "stability-ai/stable-diffusion:db21e45d3f7023abc2a46ee38a23973f6dce16bb082a930b0c49861f96d1e5bf",
       {
