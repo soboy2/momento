@@ -1,17 +1,59 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: [
-      'images.unsplash.com',
-      'firebasestorage.googleapis.com',
-      'lh3.googleusercontent.com',
-      'avatars.githubusercontent.com',
-      'randomuser.me',
-      'picsum.photos'
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "placehold.co",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "replicate.com",
+      },
+      {
+        protocol: "https",
+        hostname: "replicate.delivery",
+      },
+      {
+        protocol: "https",
+        hostname: "firebasestorage.googleapis.com",
+      },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "avatars.githubusercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "randomuser.me",
+      },
+      {
+        protocol: "https",
+        hostname: "picsum.photos",
+      }
     ],
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   // Properly handle Mapbox
   transpilePackages: ['mapbox-gl'],
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "https://api.openai.com/:path*",
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig; 
