@@ -152,7 +152,7 @@ function CreatePostContent() {
     if (selectedEvent && !location) {
       getCurrentLocation();
     }
-  }, [selectedEvent]);
+  }, [selectedEvent, location]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -306,7 +306,7 @@ function CreatePostContent() {
                       <span className="font-medium text-blue-800">{selectedEvent.name}</span>
                     </div>
                     <p className="text-xs text-blue-600 mt-1">
-                      Your moment will be added to this event's timeline
+                      Your moment will be added to this event&apos;s timeline
                     </p>
                   </div>
                   <button

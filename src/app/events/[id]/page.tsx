@@ -129,7 +129,7 @@ function EventContent() {
         <Navigation />
         <div className="max-w-4xl mx-auto px-4 py-12 text-center">
           <h1 className="text-2xl font-bold mb-4">Event Not Found</h1>
-          <p className="text-gray-600 mb-6">The event you're looking for doesn't exist or has been removed.</p>
+          <p className="text-gray-600 mb-6">The event you&apos;re looking for doesn&apos;t exist or has been removed.</p>
           <Link href="/events" className="inline-flex items-center text-blue-600 hover:text-blue-800">
             <ChevronLeft className="h-4 w-4 mr-1" />
             Back to Events
