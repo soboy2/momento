@@ -63,10 +63,7 @@ function CreatePostContent() {
     accuracy: number;
   } | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<EventData | null>(null);
   const [showEventDropdown, setShowEventDropdown] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
@@ -74,7 +71,7 @@ function CreatePostContent() {
     alpha: number | null;
     beta: number | null;
     gamma: number | null;
-  }>({ alpha: null, beta: null, gamma: null });
+  } | null>(null);
   
   // State for events from firebaseUtils
   const [events, setEvents] = useState<EventData[]>([]);
@@ -112,10 +109,7 @@ function CreatePostContent() {
         if (preselectedEventId) {
           const preselectedEvent = eventsData.find(event => event.id === preselectedEventId);
           if (preselectedEvent) {
-            setSelectedEvent({
-              id: preselectedEvent.id,
-              name: preselectedEvent.name
-            });
+            setSelectedEvent(preselectedEvent);
           }
         }
       } catch (error) {
@@ -254,7 +248,7 @@ function CreatePostContent() {
         createdAt: new Date().toISOString(),
         captureTimestamp: new Date().toISOString(),
         location: location,
-        deviceOrientation: deviceOrientation.alpha !== null ? deviceOrientation : undefined,
+        deviceOrientation: deviceOrientation?.alpha !== null ? deviceOrientation : undefined,
         eventId: selectedEvent?.id,
         eventName: selectedEvent?.name,
         contextualTags: tags.length > 0 ? tags : undefined
@@ -423,10 +417,7 @@ function CreatePostContent() {
                                     key={event.id}
                                     className="px-3 py-2 hover:bg-gray-100 rounded cursor-pointer"
                                     onClick={() => {
-                                      setSelectedEvent({
-                                        id: event.id,
-                                        name: event.name
-                                      });
+                                      setSelectedEvent(event);
                                       setShowEventDropdown(false);
                                     }}
                                   >
@@ -454,10 +445,7 @@ function CreatePostContent() {
                                     key={event.id}
                                     className="px-3 py-2 hover:bg-gray-100 rounded cursor-pointer"
                                     onClick={() => {
-                                      setSelectedEvent({
-                                        id: event.id,
-                                        name: event.name
-                                      });
+                                      setSelectedEvent(event);
                                       setShowEventDropdown(false);
                                     }}
                                   >
@@ -484,10 +472,7 @@ function CreatePostContent() {
                                       key={event.id}
                                       className="px-3 py-2 hover:bg-gray-100 rounded cursor-pointer"
                                       onClick={() => {
-                                        setSelectedEvent({
-                                          id: event.id,
-                                          name: event.name
-                                        });
+                                        setSelectedEvent(event);
                                         setShowEventDropdown(false);
                                       }}
                                     >
