@@ -2,9 +2,20 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import OpenAI from "openai";
 
-const openai = new OpenAI();
+// Check if API key exists, otherwise create a mock instance
+const openai = process.env.OPENAI_API_KEY 
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 export async function POST(req: Request) {
+  // If OpenAI client is not initialized, return a graceful error
+  if (!openai) {
+    return NextResponse.json(
+      { error: "OpenAI API key not configured" },
+      { status: 501 }
+    );
+  }
+
   const body = await req.json();
 
   const base64Audio = body.audio;
@@ -16,6 +27,11 @@ export async function POST(req: Request) {
   const filePath = "tmp/input.wav";
 
   try {
+    // Ensure tmp directory exists
+    if (!fs.existsSync("tmp")) {
+      fs.mkdirSync("tmp", { recursive: true });
+    }
+
     // Write the audio data to a temporary WAV file synchronously
     fs.writeFileSync(filePath, audio);
 
@@ -33,6 +49,15 @@ export async function POST(req: Request) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error processing audio:", error);
-    return NextResponse.error();
+    
+    // Clean up the temporary file if it exists
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    
+    return NextResponse.json(
+      { error: "Error processing audio transcription" },
+      { status: 500 }
+    );
   }
 }

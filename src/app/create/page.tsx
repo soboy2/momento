@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../lib/hooks/useAuth';
 import { addDocument, uploadFile, getDocuments } from '../../lib/firebase/firebaseUtils';
@@ -44,8 +44,20 @@ function isEventData(obj: any): obj is EventData {
 export default function CreatePostPage() {
   return (
     <AuthProvider>
-      <CreatePostContent />
+      <Suspense fallback={<LoadingState />}>
+        <CreatePostContent />
+      </Suspense>
     </AuthProvider>
+  );
+}
+
+// Loading state component
+function LoadingState() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <span className="ml-2 text-lg">Loading...</span>
+    </div>
   );
 }
 
