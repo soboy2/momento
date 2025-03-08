@@ -141,11 +141,7 @@ function CreateEventContent() {
         return;
       }
     } else if (currentStep === 2) {
-      // Validate second step
-      if (!venue.trim()) {
-        setError('Venue name is required');
-        return;
-      }
+      // Validate second step - venue is now optional
       if (!startDate || !startTime) {
         setError('Start date and time are required');
         return;
