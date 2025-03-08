@@ -10,7 +10,8 @@ export function middleware(request: NextRequest) {
                        path === '/login' || 
                        path === '/signup' || 
                        path === '/forgot-password' ||
-                       path.startsWith('/api/firebase-proxy');
+                       path.startsWith('/api/firebase-proxy') ||
+                       path.startsWith('/firebase-storage');
 
   // Check if the user is authenticated
   const isAuthenticated = request.cookies.has('auth');
@@ -38,7 +39,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - firebase-storage (Firebase Storage proxy)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|firebase-storage).*)',
   ],
 }; 

@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { app } from '../../../lib/firebase/firebase';
+
+// Initialize Firebase Storage
+const storage = getStorage(app);
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
@@ -31,7 +36,7 @@ export async function GET(request: NextRequest) {
       headers: {
         'Content-Type': contentType,
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
     });
@@ -43,12 +48,62 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function POST(request: NextRequest) {
+  try {
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    const path = formData.get('path') as string;
+    
+    if (!file || !path) {
+      return NextResponse.json({ error: 'File and path are required' }, { status: 400 });
+    }
+    
+    // Create a metadata object with CORS settings
+    const metadata = {
+      contentType: file.type,
+      customMetadata: {
+        'Access-Control-Allow-Origin': '*',
+      }
+    };
+    
+    // Upload the file to Firebase Storage
+    const storageRef = ref(storage, path);
+    const snapshot = await uploadBytes(storageRef, file, metadata);
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    return NextResponse.json(
+      { success: true, url: downloadURL },
+      {
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+      }
+    );
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to upload file' },
+      {
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+      }
+    );
+  }
+}
+
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Max-Age': '86400',
     },

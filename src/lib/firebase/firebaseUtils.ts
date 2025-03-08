@@ -444,18 +444,27 @@ export const deleteDocument = async (collectionName: string, id: string) => {
 // Storage functions
 export const uploadFile = async (file: File, path: string) => {
   try {
-    // Create a metadata object with CORS settings
-    const metadata = {
-      contentType: file.type,
-      customMetadata: {
-        'Access-Control-Allow-Origin': '*',
-      }
-    };
+    // Use our proxy API instead of direct Firebase Storage access
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('path', path);
     
-    const storageRef = ref(storage, path);
-    const snapshot = await uploadBytes(storageRef, file, metadata);
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    return { success: true, url: downloadURL };
+    const response = await fetch('/api/firebase-proxy', {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Upload failed with status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      return { success: true, url: result.url };
+    } else {
+      throw new Error(result.error || 'Upload failed');
+    }
   } catch (error) {
     console.error("Error uploading file:", error);
     return { success: false, error };
