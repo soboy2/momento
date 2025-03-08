@@ -17,7 +17,9 @@ export default function CoverPhotoUpload({ currentCoverPhoto, onCoverPhotoChange
   const { user } = useAuth();
 
   const handleEditClick = () => {
-    fileInputRef.current?.click();
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -56,6 +58,11 @@ export default function CoverPhotoUpload({ currentCoverPhoto, onCoverPhotoChange
       setUploadError('Failed to upload image. Please try again.');
     } finally {
       setUploading(false);
+      
+      // Reset the file input so the same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -96,6 +103,7 @@ export default function CoverPhotoUpload({ currentCoverPhoto, onCoverPhotoChange
         onClick={handleEditClick}
         disabled={uploading}
         className="absolute bottom-2 right-2 bg-white bg-opacity-80 text-gray-700 px-3 py-1 rounded-full text-xs font-medium hover:bg-opacity-100 transition"
+        type="button"
       >
         {uploading ? 'Uploading...' : 'Edit Cover'}
       </button>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/hooks/useAuth';
-import { getDocuments, logoutUser, getUserProfile } from '../../lib/firebase/firebaseUtils';
+import { getDocuments, logoutUser, getUserProfile, updateUserProfile } from '../../lib/firebase/firebaseUtils';
 import Post from '../../components/Post';
 import Image from 'next/image';
 import { LogOut, Settings, Calendar, MapPin, Link as LinkIcon, Heart } from 'lucide-react';
@@ -10,6 +10,7 @@ import { AuthProvider } from '../../lib/contexts/AuthContext';
 import Navigation from '../../components/Navigation';
 import { useRouter } from 'next/navigation';
 import CoverPhotoUpload from '../../components/CoverPhotoUpload';
+import EditableField from '../../components/EditableField';
 
 interface PostData {
   id: string;
@@ -55,8 +56,8 @@ function ProfileContent() {
   const [userProfile, setUserProfile] = useState<any>({
     coverPhoto: '',
     bio: '',
-    location: 'San Francisco, CA', // Default location
-    website: 'github.com/demouser', // Default website
+    location: '',
+    website: '',
     joinedDate: new Date(2023, 8, 15).toISOString(), // Default joined date
   });
 
@@ -107,6 +108,26 @@ function ProfileContent() {
       ...userProfile,
       coverPhoto: url
     });
+  };
+
+  const handleProfileUpdate = async (field: string, value: string) => {
+    if (!user) return;
+    
+    try {
+      // Update local state
+      setUserProfile({
+        ...userProfile,
+        [field]: value
+      });
+      
+      // Update in Firestore
+      await updateUserProfile(user.uid, {
+        [field]: value,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error(`Error updating ${field}:`, error);
+    }
   };
 
   if (!user) return null;
@@ -186,18 +207,22 @@ function ProfileContent() {
               <p className="text-gray-600">{user.email}</p>
               
               <div className="mt-3 space-y-2">
-                <div className="flex items-center text-gray-600">
-                  <MapPin className="h-4 w-4 mr-2" />
-                  <span className="text-sm">{userProfile.location || 'No location set'}</span>
-                </div>
-                {userProfile.website && (
-                  <div className="flex items-center text-gray-600">
-                    <LinkIcon className="h-4 w-4 mr-2" />
-                    <a href={`https://${userProfile.website}`} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-500 hover:underline">
-                      {userProfile.website}
-                    </a>
-                  </div>
-                )}
+                {/* Editable Location */}
+                <EditableField 
+                  value={userProfile.location || ''}
+                  placeholder="Add your location"
+                  icon={<MapPin className="h-4 w-4" />}
+                  onSave={(value) => handleProfileUpdate('location', value)}
+                />
+                
+                {/* Editable Website */}
+                <EditableField 
+                  value={userProfile.website || ''}
+                  placeholder="Add your website"
+                  icon={<LinkIcon className="h-4 w-4" />}
+                  onSave={(value) => handleProfileUpdate('website', value)}
+                />
+                
                 <div className="flex items-center text-gray-600">
                   <Calendar className="h-4 w-4 mr-2" />
                   <span className="text-sm">Joined {joinedDateFormatted}</span>
