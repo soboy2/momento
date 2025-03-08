@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../lib/hooks/useAuth';
-import { addDocument, uploadFile, getDocuments } from '../../lib/firebase/firebaseUtils';
+import { addDocument, uploadFile, getDocuments, updateDocument } from '../../lib/firebase/firebaseUtils';
 import { 
   ImageUp, Loader2, MapPin, Tag, Calendar, X, ChevronDown, 
   Camera, ArrowLeft, Info, Clock 
@@ -12,6 +12,7 @@ import Image from 'next/image';
 import { AuthProvider } from '../../lib/contexts/AuthContext';
 import Navigation from '../../components/Navigation';
 import Link from 'next/link';
+import { toast } from 'react-hot-toast';
 
 // Define the Event interface
 interface EventData {
@@ -249,9 +250,24 @@ function CreatePostContent() {
     try {
       let imageURL = '';
       
+      // Handle image upload if an image is selected
       if (image) {
-        const path = `posts/${user.uid}/${Date.now()}_${image.name}`;
-        imageURL = await uploadFile(image, path);
+        try {
+          console.log('Starting image upload process');
+          const path = `posts/${user.uid}/${Date.now()}_${image.name}`;
+          
+          // Upload the image and get the URL
+          imageURL = await uploadFile(image, path);
+          console.log('Image uploaded successfully:', imageURL);
+        } catch (uploadError: any) {
+          console.error('Error uploading image:', uploadError);
+          
+          // Show error but continue with post creation
+          setError(`Image upload failed: ${uploadError.message || 'Unknown error'}`);
+          
+          // Continue without the image
+          imageURL = '';
+        }
       }
 
       // Create post data object, omitting undefined fields
@@ -260,7 +276,6 @@ function CreatePostContent() {
         userName: user.displayName || 'Anonymous',
         userPhotoURL: user.photoURL || '',
         text: text.trim(),
-        imageURL: imageURL || '',
         likes: [],
         comments: [],
         createdAt: new Date().toISOString(),
@@ -271,34 +286,60 @@ function CreatePostContent() {
         ...(tags.length > 0 && { contextualTags: tags })
       };
       
+      // Only add imageURL if it was successfully uploaded
+      if (imageURL) {
+        postData.imageURL = imageURL;
+      }
+      
       // Only add deviceOrientation if it's valid
       if (deviceOrientation && deviceOrientation.alpha !== null && 
           deviceOrientation.beta !== null && deviceOrientation.gamma !== null) {
         postData.deviceOrientation = deviceOrientation;
       }
       
-      await addDocument('posts', postData);
+      console.log('Creating post with data:', postData);
       
+      // Add the post to Firestore
+      const result = await addDocument('posts', postData);
+      
+      if (!result.success) {
+        throw new Error(result.error ? result.error.toString() : 'Failed to create post');
+      }
+      
+      console.log('Post created successfully:', result.id);
+
       // If this post is associated with an event, update the event's post count
       if (selectedEvent) {
         const eventData = events.find(event => event.id === selectedEvent.id);
         if (eventData) {
-          await addDocument('events', {
-            ...eventData,
-            postCount: eventData.postCount + 1
-          });
+          try {
+            await updateDocument('events', selectedEvent.id, {
+              postCount: (eventData.postCount || 0) + 1
+            });
+          } catch (eventUpdateError) {
+            console.error('Error updating event post count:', eventUpdateError);
+            // Continue even if event update fails
+          }
         }
       }
 
-      // Redirect to the appropriate page
-      if (selectedEvent) {
-        router.push(`/events/${selectedEvent.id}`);
-      } else {
-        router.push('/home');
-      }
-    } catch (error) {
+      // Reset the form
+      setText('');
+      setImage(null);
+      setImagePreview(null);
+      setTags([]);
+      setTagInput('');
+      setLocation(null);
+      setSelectedEvent(null);
+      
+      // Show success message
+      toast.success('Post created successfully!');
+      
+      // Redirect to home page
+      router.push('/home');
+    } catch (error: any) {
       console.error('Error creating post:', error);
-      setError('Failed to create post. Please try again.');
+      setError(`Failed to create post: ${error.message || 'Unknown error'}`);
       setIsSubmitting(false);
     }
   };

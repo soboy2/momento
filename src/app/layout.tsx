@@ -1,4 +1,5 @@
 import "./globals.css";
+import { Toaster } from "react-hot-toast";
 
 export const metadata = {
   title: "Social Media App",
@@ -14,6 +15,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="min-h-screen bg-gray-50">
         {children}
+        <Toaster position="bottom-center" />
       </body>
     </html>
   );

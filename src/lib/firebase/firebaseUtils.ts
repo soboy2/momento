@@ -443,30 +443,51 @@ export const deleteDocument = async (collectionName: string, id: string) => {
 
 // Storage functions
 export const uploadFile = async (file: File, path: string) => {
+  console.log(`Starting uploadFile for ${file.name} (${file.size} bytes) to path: ${path}`);
+  
   try {
-    // Use our proxy API instead of direct Firebase Storage access
+    // Create a FormData object for the file upload
     const formData = new FormData();
     formData.append('file', file);
     formData.append('path', path);
     
+    console.log('Sending request to Firebase proxy API');
+    
+    // Send the request to our proxy API
     const response = await fetch('/api/firebase-proxy', {
       method: 'POST',
       body: formData,
     });
     
-    if (!response.ok) {
-      throw new Error(`Upload failed with status: ${response.status}`);
+    // Get the response as text first for debugging
+    const responseText = await response.text();
+    console.log(`Response status: ${response.status}, Response text:`, responseText);
+    
+    // Parse the response as JSON
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Error parsing response:', parseError);
+      throw new Error(`Invalid response format: ${responseText}`);
     }
     
-    const result = await response.json();
+    // Check if the request was successful
+    if (!response.ok) {
+      console.error('Upload failed with status:', response.status, result);
+      throw new Error(result.error || `Upload failed with status: ${response.status}`);
+    }
     
-    if (result.success) {
+    // Check if the result indicates success
+    if (result.success && result.url) {
+      console.log('Upload successful, URL:', result.url);
       return result.url;
     } else {
-      throw new Error(result.error || 'Upload failed');
+      console.error('Upload failed:', result);
+      throw new Error(result.error || 'Upload failed with unknown error');
     }
   } catch (error) {
-    console.error("Error uploading file:", error);
+    console.error("Error in uploadFile:", error);
     throw error; // Re-throw the error to be handled by the caller
   }
 };
