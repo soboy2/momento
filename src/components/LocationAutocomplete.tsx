@@ -60,11 +60,25 @@ export default function LocationAutocomplete({ value, onSave }: LocationAutocomp
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
+  // Update input value when prop value changes
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
+      
+      // Show initial suggestions when editing starts
+      if (inputValue) {
+        updateSuggestions(inputValue);
+      } else {
+        // Show top 5 cities if no input
+        setSuggestions(POPULAR_CITIES.slice(0, 5));
+        setShowSuggestions(true);
+      }
     }
-  }, [isEditing]);
+  }, [isEditing, inputValue]);
 
   useEffect(() => {
     // Handle clicks outside the component to close suggestions
@@ -85,8 +99,28 @@ export default function LocationAutocomplete({ value, onSave }: LocationAutocomp
     };
   }, []);
 
+  const updateSuggestions = (text: string) => {
+    if (!text.trim()) {
+      // Show top 5 cities if no input
+      setSuggestions(POPULAR_CITIES.slice(0, 5));
+      setShowSuggestions(true);
+      return;
+    }
+    
+    // Filter cities based on input
+    const filtered = POPULAR_CITIES.filter(city => 
+      city.toLowerCase().includes(text.toLowerCase())
+    ).slice(0, 5); // Limit to 5 suggestions
+    
+    setSuggestions(filtered);
+    setShowSuggestions(true);
+  };
+
   const handleEdit = () => {
     setIsEditing(true);
+    // Show suggestions immediately when editing starts
+    setSuggestions(POPULAR_CITIES.slice(0, 5));
+    setShowSuggestions(true);
   };
 
   const handleCancel = () => {
@@ -106,7 +140,7 @@ export default function LocationAutocomplete({ value, onSave }: LocationAutocomp
       handleSave();
     } else if (e.key === 'Escape') {
       handleCancel();
-    } else if (e.key === 'ArrowDown' && suggestions.length > 0) {
+    } else if (e.key === 'ArrowDown') {
       setShowSuggestions(true);
     }
   };
@@ -114,20 +148,7 @@ export default function LocationAutocomplete({ value, onSave }: LocationAutocomp
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setInputValue(value);
-    
-    if (value.trim() === '') {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-    
-    // Filter cities based on input
-    const filtered = POPULAR_CITIES.filter(city => 
-      city.toLowerCase().includes(value.toLowerCase())
-    ).slice(0, 5); // Limit to 5 suggestions
-    
-    setSuggestions(filtered);
-    setShowSuggestions(filtered.length > 0);
+    updateSuggestions(value);
   };
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -135,6 +156,13 @@ export default function LocationAutocomplete({ value, onSave }: LocationAutocomp
     onSave(suggestion);
     setIsEditing(false);
     setShowSuggestions(false);
+  };
+
+  const toggleSuggestions = () => {
+    if (!showSuggestions) {
+      updateSuggestions(inputValue);
+    }
+    setShowSuggestions(!showSuggestions);
   };
 
   return (
@@ -153,27 +181,30 @@ export default function LocationAutocomplete({ value, onSave }: LocationAutocomp
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                onFocus={() => inputValue && setSuggestions(POPULAR_CITIES.filter(city => 
-                  city.toLowerCase().includes(inputValue.toLowerCase())
-                ).slice(0, 5))}
+                onFocus={() => setShowSuggestions(true)}
                 placeholder="Add your location"
                 className="flex-1 text-sm border-b border-blue-400 focus:outline-none py-1 pr-6 w-full"
+                autoComplete="off"
               />
-              <ChevronDown 
-                size={16} 
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400"
-                onClick={() => setShowSuggestions(!showSuggestions)}
-              />
+              <button
+                type="button"
+                onClick={toggleSuggestions}
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <ChevronDown size={16} />
+              </button>
             </div>
             <button 
               onClick={handleSave}
               className="ml-2 p-1 text-green-500 hover:bg-green-50 rounded-full"
+              type="button"
             >
               <Check size={16} />
             </button>
             <button 
               onClick={handleCancel}
               className="ml-1 p-1 text-red-500 hover:bg-red-50 rounded-full"
+              type="button"
             >
               <X size={16} />
             </button>
@@ -184,6 +215,7 @@ export default function LocationAutocomplete({ value, onSave }: LocationAutocomp
             <button 
               onClick={handleEdit}
               className="ml-2 p-1 text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
+              type="button"
             >
               <ChevronDown size={14} />
             </button>
@@ -195,7 +227,7 @@ export default function LocationAutocomplete({ value, onSave }: LocationAutocomp
       {showSuggestions && (
         <div 
           ref={suggestionsRef}
-          className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-auto"
+          className="absolute z-20 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-auto"
         >
           {suggestions.length > 0 ? (
             <ul className="py-1">
