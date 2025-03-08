@@ -254,7 +254,8 @@ function CreatePostContent() {
         imageURL = await uploadFile(image, path);
       }
 
-      const postId = await addDocument('posts', {
+      // Create post data object, omitting undefined fields
+      const postData: any = {
         userId: user.uid,
         userName: user.displayName || 'Anonymous',
         userPhotoURL: user.photoURL || '',
@@ -265,11 +266,18 @@ function CreatePostContent() {
         createdAt: new Date().toISOString(),
         captureTimestamp: new Date().toISOString(),
         location: location,
-        deviceOrientation: deviceOrientation?.alpha !== null ? deviceOrientation : undefined,
-        eventId: selectedEvent?.id,
-        eventName: selectedEvent?.name,
-        contextualTags: tags.length > 0 ? tags : undefined
-      });
+        ...(selectedEvent?.id && { eventId: selectedEvent.id }),
+        ...(selectedEvent?.name && { eventName: selectedEvent.name }),
+        ...(tags.length > 0 && { contextualTags: tags })
+      };
+      
+      // Only add deviceOrientation if it's valid
+      if (deviceOrientation && deviceOrientation.alpha !== null && 
+          deviceOrientation.beta !== null && deviceOrientation.gamma !== null) {
+        postData.deviceOrientation = deviceOrientation;
+      }
+      
+      await addDocument('posts', postData);
       
       // If this post is associated with an event, update the event's post count
       if (selectedEvent) {
