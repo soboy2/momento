@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
+import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Play, Pause } from 'lucide-react';
 
@@ -26,7 +27,7 @@ interface EventHeatmapProps {
 
 export default function EventHeatmap({ posts, eventId, className = '' }: EventHeatmapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<any>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
   const [timeRange, setTimeRange] = useState<[Date, Date]>([new Date(), new Date()]);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [timeIndex, setTimeIndex] = useState(0);
@@ -37,7 +38,7 @@ export default function EventHeatmap({ posts, eventId, className = '' }: EventHe
 
   // Process posts to create time-bucketed data
   const processPostsData = useCallback(() => {
-    if (posts.length === 0) return { timeBuckets: [], timeRange: [new Date(), new Date()] };
+    if (posts.length === 0) return { timeBuckets: [], timeRange: [new Date(), new Date()] as [Date, Date] };
 
     // Sort posts by timestamp
     const sortedPosts = [...posts].sort((a, b) => 
@@ -70,11 +71,157 @@ export default function EventHeatmap({ posts, eventId, className = '' }: EventHe
       buckets[bucketIndex].push(post);
     });
     
+    setTimeRange([startTime, endTime] as [Date, Date]);
+    
     return { 
       timeBuckets: buckets,
       timeRange: [startTime, endTime] as [Date, Date]
     };
   }, [posts]);
+
+  // Initialize the map
+  useEffect(() => {
+    if (map.current || !mapContainer.current) return;
+
+    // Set the Mapbox access token
+    const accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+    if (!accessToken) {
+      console.error('Mapbox access token is not defined');
+      return;
+    }
+
+    mapboxgl.accessToken = accessToken;
+
+    // Calculate the center of the map based on posts
+    let center: [number, number] = [-74.5, 40]; // Default to NYC
+    let zoom = 9;
+
+    if (posts.length > 0) {
+      // Calculate the average of all post locations
+      const sumLat = posts.reduce((sum, post) => sum + post.location.latitude, 0);
+      const sumLng = posts.reduce((sum, post) => sum + post.location.longitude, 0);
+      center = [sumLng / posts.length, sumLat / posts.length];
+    }
+
+    // Create the map
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: process.env.NEXT_PUBLIC_MAPBOX_STYLE || 'mapbox://styles/mapbox/dark-v11',
+      center: center,
+      zoom: zoom,
+    });
+
+    // Add navigation controls
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Wait for the map to load
+    map.current.on('load', () => {
+      if (!map.current) return;
+
+      // Create GeoJSON data from posts
+      const geojsonData = {
+        type: 'FeatureCollection',
+        features: posts.map(post => ({
+          type: 'Feature',
+          properties: {
+            id: post.id,
+            timestamp: post.timestamp
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [post.location.longitude, post.location.latitude]
+          }
+        }))
+      };
+
+      // Add the source
+      map.current.addSource('posts', {
+        type: 'geojson',
+        data: geojsonData as any
+      });
+
+      // Add a heatmap layer
+      map.current.addLayer({
+        id: 'posts-heat',
+        type: 'heatmap',
+        source: 'posts',
+        paint: {
+          // Increase the heatmap weight based on frequency of points
+          'heatmap-weight': 1,
+          // Increase the heatmap color weight weight by zoom level
+          'heatmap-intensity': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            0, 1,
+            9, 3
+          ],
+          // Color ramp for heatmap.  Domain is 0 (low) to 1 (high).
+          'heatmap-color': [
+            'interpolate',
+            ['linear'],
+            ['heatmap-density'],
+            0, 'rgba(33,102,172,0)',
+            0.2, 'rgb(103,169,207)',
+            0.4, 'rgb(209,229,240)',
+            0.6, 'rgb(253,219,199)',
+            0.8, 'rgb(239,138,98)',
+            1, 'rgb(178,24,43)'
+          ],
+          // Adjust the heatmap radius by zoom level
+          'heatmap-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            0, 2,
+            9, 20
+          ],
+          // Transition from heatmap to circle layer by zoom level
+          'heatmap-opacity': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            7, 1,
+            9, 0.5
+          ],
+        }
+      });
+
+      // Add a circle layer
+      map.current.addLayer({
+        id: 'posts-point',
+        type: 'circle',
+        source: 'posts',
+        paint: {
+          'circle-radius': 6,
+          'circle-color': '#1E88E5',
+          'circle-stroke-width': 1,
+          'circle-stroke-color': 'white',
+          'circle-opacity': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            7, 0,
+            8, 0.5
+          ]
+        }
+      });
+
+      setMapLoaded(true);
+      
+      // Process the posts data
+      const { timeRange: newTimeRange } = processPostsData();
+      setTimeRange(newTimeRange);
+      setCurrentTime(newTimeRange[0]);
+    });
+
+    return () => {
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+    };
+  }, [posts, processPostsData]);
 
   // Update the heatmap with new data
   const updateHeatmap = useCallback((postsData: PostLocation[]) => {
@@ -104,20 +251,16 @@ export default function EventHeatmap({ posts, eventId, className = '' }: EventHe
   }, [mapLoaded]);
 
   useEffect(() => {
-    if (posts.length > 0) {
+    if (posts.length > 0 && mapLoaded) {
       processPostsData();
     }
 
     return () => {
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [posts, processPostsData, updateHeatmap]);
+  }, [posts, mapLoaded, processPostsData]);
 
   // Handle time slider change
   const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,27 +295,27 @@ export default function EventHeatmap({ posts, eventId, className = '' }: EventHe
     if (playing && mapLoaded && processedPosts.length > 0) {
       let frame = 0;
       const animate = () => {
-        frame = (frame + 1) % processedPosts.length;
-        const bucketIndex = Math.min(
-          Math.floor(frame / processedPosts.length),
-          processedPosts.length - 1
-        );
+        frame = (frame + 1) % 101; // 0-100 for slider
         
-        if (bucketIndex !== timeIndex) {
-          setTimeIndex(bucketIndex);
-          updateHeatmap([processedPosts[bucketIndex]]);
-          
-          // Update current time display
-          const timeProgress = bucketIndex / (processedPosts.length - 1);
-          const newTime = new Date(
-            timeRange[0].getTime() + 
-            (timeRange[1].getTime() - timeRange[0].getTime()) * timeProgress
-          );
-          setCurrentTime(newTime);
-        }
+        // Update time index
+        setTimeIndex(frame);
+        
+        // Update current time display
+        const timeProgress = frame / 100;
+        const newTime = new Date(
+          timeRange[0].getTime() + 
+          (timeRange[1].getTime() - timeRange[0].getTime()) * timeProgress
+        );
+        setCurrentTime(newTime);
+        
+        // Update the heatmap
+        const postsToShow = processedPosts.filter(post => 
+          new Date(post.timestamp).getTime() <= newTime.getTime()
+        );
+        updateHeatmap(postsToShow);
         
         // Stop at the end
-        if (frame === processedPosts.length - 1) {
+        if (frame === 100) {
           setPlaying(false);
           return;
         }
@@ -180,7 +323,7 @@ export default function EventHeatmap({ posts, eventId, className = '' }: EventHe
         animationRef.current = requestAnimationFrame(animate);
       };
       
-      animate();
+      animationRef.current = requestAnimationFrame(animate);
     }
     
     return () => {
@@ -188,7 +331,7 @@ export default function EventHeatmap({ posts, eventId, className = '' }: EventHe
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [playing, timeRange, mapLoaded, processedPosts, timeIndex, updateHeatmap]);
+  }, [playing, timeRange, mapLoaded, processedPosts, updateHeatmap]);
 
   // Format time for display
   const formatTime = (date: Date) => {
