@@ -39,6 +39,14 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "picsum.photos",
+      },
+      {
+        protocol: "https",
+        hostname: "www.gstatic.com",
+      },
+      {
+        protocol: "https",
+        hostname: "ui-avatars.com",
       }
     ],
     dangerouslyAllowSVG: true,

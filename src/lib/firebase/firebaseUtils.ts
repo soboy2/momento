@@ -1,21 +1,24 @@
-// Mock Firebase utilities for local development
-// import { auth, db, storage } from "./firebase";
-// import {
-//   signOut,
-//   GoogleAuthProvider,
-//   signInWithPopup,
-// } from "firebase/auth";
-// import {
-//   collection,
-//   addDoc,
-//   getDocs,
-//   doc,
-//   updateDoc,
-//   deleteDoc,
-// } from "firebase/firestore";
-// import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+// Firebase utilities for production
+import { auth, db, storage } from "./firebase";
+import {
+  signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+} from "firebase/auth";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  getDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+} from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-// Mock data storage
+// Mock data storage - keeping for fallback
 let mockPosts: any[] = [];
 let mockEvents: any[] = [];
 let mockStorage: Record<string, string> = {};
@@ -255,7 +258,7 @@ const initializeDummyData = () => {
         userId: 'mock-user-123',
         userName: 'Demo User',
         userPhotoURL: 'https://ui-avatars.com/api/?name=Demo+User&background=random&size=128',
-        text: 'Amazing performance at the Summer Music Festival! The energy was incredible! ��',
+        text: 'Amazing performance at the Summer Music Festival! The energy was incredible!',
         imageURL: 'https://images.unsplash.com/photo-1429962714451-bb934ecdc4ec?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80',
         likes: ['user-1', 'user-2'],
         comments: [
@@ -321,174 +324,131 @@ const initializeDummyData = () => {
   }
 };
 
-// Auth functions
+// Authentication functions
 export const logoutUser = async () => {
-  localStorage.removeItem('mockUser');
-  return Promise.resolve();
+  try {
+    await signOut(auth);
+    return { success: true };
+  } catch (error) {
+    console.error("Error signing out:", error);
+    return { success: false, error };
+  }
 };
 
 export const signInWithGoogle = async () => {
-  const mockUser = {
-    uid: 'mock-user-123',
-    displayName: 'Demo User',
-    email: 'demo@example.com',
-    photoURL: 'https://ui-avatars.com/api/?name=Demo+User&background=random&size=128',
-  };
-  localStorage.setItem('mockUser', JSON.stringify(mockUser));
-  return mockUser;
+  try {
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    return { success: true, user: result.user };
+  } catch (error) {
+    console.error("Error signing in with Google:", error);
+    return { success: false, error };
+  }
 };
 
 // Firestore functions
 export const addDocument = async (collectionName: string, data: any) => {
-  const id = `mock-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const newDoc = { id, ...data };
-  
-  if (collectionName === 'posts') {
-    // Load existing posts from localStorage
-    const storedPosts = localStorage.getItem('mockPosts');
-    if (storedPosts) {
-      mockPosts = JSON.parse(storedPosts);
-    }
-    
-    mockPosts.push(newDoc);
-    localStorage.setItem('mockPosts', JSON.stringify(mockPosts));
-  } else if (collectionName === 'events') {
-    // Load existing events from localStorage
-    const storedEvents = localStorage.getItem('mockEvents');
-    if (storedEvents) {
-      mockEvents = JSON.parse(storedEvents);
-    }
-    
-    mockEvents.push(newDoc);
-    localStorage.setItem('mockEvents', JSON.stringify(mockEvents));
+  try {
+    const collectionRef = collection(db, collectionName);
+    const docRef = await addDoc(collectionRef, {
+      ...data,
+      createdAt: new Date().toISOString(),
+    });
+    return { success: true, id: docRef.id };
+  } catch (error) {
+    console.error(`Error adding document to ${collectionName}:`, error);
+    return { success: false, error };
   }
-  
-  return { id };
 };
 
-export const getDocuments = async (collectionName: string) => {
+export const getDocuments = async (collectionName: string, filters?: { field: string, operator: string, value: any }[]) => {
   try {
-    console.log(`Getting documents from ${collectionName}...`);
-    
-    if (collectionName === 'posts') {
-      // Try to load posts from localStorage first
-      const storedPosts = localStorage.getItem('mockPosts');
-      if (storedPosts) {
-        const parsedPosts = JSON.parse(storedPosts);
-        if (parsedPosts && parsedPosts.length > 0) {
-          console.log(`Loaded ${parsedPosts.length} posts from localStorage`);
-          return parsedPosts;
-        }
-      }
-      
-      // If no posts in localStorage, initialize dummy data
-      console.log('No posts found in localStorage, initializing dummy data');
-      const posts = initializeDummyData();
-      return posts;
-    } else if (collectionName === 'events') {
-      // Try to load events from localStorage first
-      const storedEvents = localStorage.getItem('mockEvents');
-      if (storedEvents) {
-        const parsedEvents = JSON.parse(storedEvents);
-        if (parsedEvents && parsedEvents.length > 0) {
-          console.log(`Loaded ${parsedEvents.length} events from localStorage`);
-          return parsedEvents;
-        }
-      }
-      
-      // If no events in localStorage, initialize dummy events
-      console.log('No events found in localStorage, initializing dummy events');
-      const events = initializeDummyEvents();
-      return events;
+    let q;
+    if (filters && filters.length > 0) {
+      q = query(
+        collection(db, collectionName),
+        ...filters.map(filter => where(filter.field, filter.operator as any, filter.value))
+      );
+    } else {
+      q = collection(db, collectionName);
     }
     
-    return [];
+    const querySnapshot = await getDocs(q);
+    const documents = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    return documents;
   } catch (error) {
     console.error(`Error getting documents from ${collectionName}:`, error);
+    // Fallback to mock data if Firebase fails
+    if (collectionName === 'posts') {
+      if (mockPosts.length === 0) {
+        initializeDummyData();
+        mockPosts = JSON.parse(localStorage.getItem('mockPosts') || '[]');
+      }
+      return mockPosts;
+    } else if (collectionName === 'events') {
+      if (mockEvents.length === 0) {
+        mockEvents = initializeDummyEvents();
+      }
+      return mockEvents;
+    }
     return [];
   }
 };
 
 export const getDocument = async (collectionName: string, id: string) => {
-  if (collectionName === 'events') {
-    // Initialize dummy data if needed
-    initializeDummyData();
+  try {
+    const docRef = doc(db, collectionName, id);
+    const docSnap = await getDoc(docRef);
     
-    // Load events from localStorage
-    const storedEvents = localStorage.getItem('mockEvents');
-    if (storedEvents) {
-      const events = JSON.parse(storedEvents);
-      return events.find((event: any) => event.id === id) || null;
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() };
+    } else {
+      console.log(`No document found with id ${id} in ${collectionName}`);
+      return null;
     }
-  } else if (collectionName === 'posts') {
-    // Load posts from localStorage
-    const storedPosts = localStorage.getItem('mockPosts');
-    if (storedPosts) {
-      const posts = JSON.parse(storedPosts);
-      return posts.find((post: any) => post.id === id) || null;
-    }
+  } catch (error) {
+    console.error(`Error getting document from ${collectionName}:`, error);
+    return null;
   }
-  return null;
 };
 
 export const updateDocument = async (collectionName: string, id: string, data: any) => {
-  if (collectionName === 'posts') {
-    // Load existing posts from localStorage
-    const storedPosts = localStorage.getItem('mockPosts');
-    if (storedPosts) {
-      mockPosts = JSON.parse(storedPosts);
-      const index = mockPosts.findIndex(post => post.id === id);
-      if (index !== -1) {
-        mockPosts[index] = { ...mockPosts[index], ...data };
-        localStorage.setItem('mockPosts', JSON.stringify(mockPosts));
-      }
-    }
-  } else if (collectionName === 'events') {
-    // Load existing events from localStorage
-    const storedEvents = localStorage.getItem('mockEvents');
-    if (storedEvents) {
-      mockEvents = JSON.parse(storedEvents);
-      const index = mockEvents.findIndex(event => event.id === id);
-      if (index !== -1) {
-        mockEvents[index] = { ...mockEvents[index], ...data };
-        localStorage.setItem('mockEvents', JSON.stringify(mockEvents));
-      }
-    }
+  try {
+    const docRef = doc(db, collectionName, id);
+    await updateDoc(docRef, {
+      ...data,
+      updatedAt: new Date().toISOString(),
+    });
+    return { success: true };
+  } catch (error) {
+    console.error(`Error updating document in ${collectionName}:`, error);
+    return { success: false, error };
   }
-  return Promise.resolve();
 };
 
 export const deleteDocument = async (collectionName: string, id: string) => {
-  if (collectionName === 'posts') {
-    // Load existing posts from localStorage
-    const storedPosts = localStorage.getItem('mockPosts');
-    if (storedPosts) {
-      mockPosts = JSON.parse(storedPosts);
-      mockPosts = mockPosts.filter(post => post.id !== id);
-      localStorage.setItem('mockPosts', JSON.stringify(mockPosts));
-    }
-  } else if (collectionName === 'events') {
-    // Load existing events from localStorage
-    const storedEvents = localStorage.getItem('mockEvents');
-    if (storedEvents) {
-      mockEvents = JSON.parse(storedEvents);
-      mockEvents = mockEvents.filter(event => event.id !== id);
-      localStorage.setItem('mockEvents', JSON.stringify(mockEvents));
-    }
+  try {
+    const docRef = doc(db, collectionName, id);
+    await deleteDoc(docRef);
+    return { success: true };
+  } catch (error) {
+    console.error(`Error deleting document from ${collectionName}:`, error);
+    return { success: false, error };
   }
-  return Promise.resolve();
 };
 
 // Storage functions
 export const uploadFile = async (file: File, path: string) => {
-  return new Promise<string>((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64data = reader.result as string;
-      mockStorage[path] = base64data;
-      localStorage.setItem('mockStorage', JSON.stringify(mockStorage));
-      resolve(base64data);
-    };
-    reader.readAsDataURL(file);
-  });
+  try {
+    const storageRef = ref(storage, path);
+    const snapshot = await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    return { success: true, url: downloadURL };
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    return { success: false, error };
+  }
 };

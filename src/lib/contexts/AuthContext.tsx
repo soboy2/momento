@@ -2,64 +2,63 @@
 
 import React, { createContext, useEffect, useState } from "react";
 import Cookies from 'js-cookie';
-// Commenting out Firebase imports for now
-// import { signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut } from "firebase/auth";
-// import { User } from "firebase/auth";
-// import { auth } from "../firebase/firebase";
-
-// Mock User type
-interface MockUser {
-  uid: string;
-  displayName: string | null;
-  email: string | null;
-  photoURL: string | null;
-}
+import { onAuthStateChanged, User } from "firebase/auth";
+import { auth } from "../firebase/firebase";
+import { signInWithGoogle as firebaseSignInWithGoogle, logoutUser as firebaseSignOut } from "../firebase/firebaseUtils";
 
 interface AuthContextType {
-  user: MockUser | null;
+  user: User | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
-// Create a default mock user
-const defaultMockUser: MockUser = {
-  uid: 'mock-user-123',
-  displayName: 'Demo User',
-  email: 'demo@example.com',
-  photoURL: 'https://ui-avatars.com/api/?name=Demo+User&background=random&size=128',
-};
-
 const AuthContext = createContext<AuthContextType>({
-  user: defaultMockUser,
-  loading: false,
+  user: null,
+  loading: true,
   signInWithGoogle: async () => {},
   signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<MockUser | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check for auth cookie on initial load
+  // Listen for auth state changes
   useEffect(() => {
-    const authCookie = Cookies.get('auth');
-    if (authCookie) {
-      setUser(defaultMockUser);
-    }
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, (authUser) => {
+      if (authUser) {
+        setUser(authUser);
+        // Set auth cookie with 7 days expiry
+        Cookies.set('auth', 'authenticated', { expires: 7 });
+      } else {
+        setUser(null);
+        // Remove auth cookie
+        Cookies.remove('auth');
+      }
+      setLoading(false);
+    });
+
+    // Cleanup subscription
+    return () => unsubscribe();
   }, []);
   
   const signInWithGoogle = async () => {
-    setUser(defaultMockUser);
-    // Set auth cookie with 7 days expiry
-    Cookies.set('auth', 'authenticated', { expires: 7 });
+    try {
+      await firebaseSignInWithGoogle();
+    } catch (error) {
+      console.error("Error signing in with Google:", error);
+    }
   };
 
   const signOutUser = async () => {
-    // Remove auth cookie
-    Cookies.remove('auth');
-    setUser(null);
+    try {
+      await firebaseSignOut();
+      // Remove auth cookie
+      Cookies.remove('auth');
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   return (
