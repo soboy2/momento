@@ -22,6 +22,10 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "momento-4142e.firebasestorage.app",
+      },
+      {
+        protocol: "https",
         hostname: "images.unsplash.com",
       },
       {
@@ -59,6 +63,29 @@ const nextConfig = {
       {
         source: "/api/:path*",
         destination: "https://api.openai.com/:path*",
+      },
+      // Add a rewrite for Firebase Storage
+      {
+        source: "/firebase-storage/:path*",
+        destination: "https://firebasestorage.googleapis.com/v0/b/momento-4142e.firebasestorage.app/:path*",
+      }
+    ];
+  },
+  async headers() {
+    return [
+      {
+        // Apply these headers to all routes
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups',
+          },
+          {
+            key: 'Cross-Origin-Embedder-Policy',
+            value: 'credentialless',
+          },
+        ],
       },
     ];
   },

@@ -444,8 +444,16 @@ export const deleteDocument = async (collectionName: string, id: string) => {
 // Storage functions
 export const uploadFile = async (file: File, path: string) => {
   try {
+    // Create a metadata object with CORS settings
+    const metadata = {
+      contentType: file.type,
+      customMetadata: {
+        'Access-Control-Allow-Origin': '*',
+      }
+    };
+    
     const storageRef = ref(storage, path);
-    const snapshot = await uploadBytes(storageRef, file);
+    const snapshot = await uploadBytes(storageRef, file, metadata);
     const downloadURL = await getDownloadURL(snapshot.ref);
     return { success: true, url: downloadURL };
   } catch (error) {

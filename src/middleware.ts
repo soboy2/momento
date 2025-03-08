@@ -1,5 +1,4 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 // This function can be marked `async` if using `await` inside
 export function middleware(request: NextRequest) {
@@ -7,10 +6,13 @@ export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Define public paths that don't require authentication
-  const isPublicPath = path === '/login' || path === '/' || path === '/api';
+  const isPublicPath = path === '/' ||
+                       path === '/login' || 
+                       path === '/signup' || 
+                       path === '/forgot-password' ||
+                       path.startsWith('/api/firebase-proxy');
 
-  // Check if the user is authenticated by looking for the auth cookie
-  // This is a simple check - in a real app, you'd verify the token
+  // Check if the user is authenticated
   const isAuthenticated = request.cookies.has('auth');
 
   // If the path is not public and the user is not authenticated, redirect to login
