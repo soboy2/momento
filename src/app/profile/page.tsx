@@ -8,6 +8,7 @@ import Image from 'next/image';
 import { LogOut, Settings, Calendar, MapPin, Link as LinkIcon, Heart } from 'lucide-react';
 import { AuthProvider } from '../../lib/contexts/AuthContext';
 import Navigation from '../../components/Navigation';
+import { useRouter } from 'next/navigation';
 
 interface PostData {
   id: string;
@@ -45,7 +46,7 @@ export default function ProfilePage() {
 }
 
 function ProfileContent() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [userPosts, setUserPosts] = useState<PostData[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -53,6 +54,7 @@ function ProfileContent() {
     totalComments: 0
   });
   const [avatarError, setAvatarError] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchUserPosts = async () => {
@@ -85,8 +87,8 @@ function ProfileContent() {
 
   const handleLogout = async () => {
     try {
-      await logoutUser();
-      // No need to redirect since we're always using a mock user
+      await signOut();
+      router.push('/login');
     } catch (error) {
       console.error('Error logging out:', error);
     }

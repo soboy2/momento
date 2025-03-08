@@ -8,6 +8,7 @@ import Navigation from '../../components/Navigation';
 import Link from 'next/link';
 import { Calendar, MapPin, Users, ChevronRight, Clock } from 'lucide-react';
 import Image from 'next/image';
+import { useAuth } from '../../lib/hooks/useAuth';
 
 interface PostData {
   id: string;
@@ -72,6 +73,7 @@ function HomeContent() {
   const [loading, setLoading] = useState(true);
   const [upcomingEvents, setUpcomingEvents] = useState<EventData[]>([]);
   const [activeEvents, setActiveEvents] = useState<EventData[]>([]);
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -157,6 +159,33 @@ function HomeContent() {
       <Navigation />
       
       <div className="max-w-xl mx-auto px-4 py-6">
+        {/* Welcome Section */}
+        {user && (
+          <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+            <div className="flex items-center">
+              {user.photoURL ? (
+                <Image 
+                  src={user.photoURL} 
+                  alt={user.displayName || 'User'} 
+                  width={48} 
+                  height={48} 
+                  className="rounded-full mr-3"
+                />
+              ) : (
+                <div className="w-12 h-12 bg-blue-200 rounded-full flex items-center justify-center mr-3">
+                  <span className="text-blue-700 font-bold text-lg">
+                    {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
+                  </span>
+                </div>
+              )}
+              <div>
+                <h2 className="text-lg font-semibold">Welcome, {user.displayName || 'User'}!</h2>
+                <p className="text-sm text-gray-600">You're now signed in with Google</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Active Events Section */}
         {activeEvents.length > 0 && (
           <div className="mb-6">
