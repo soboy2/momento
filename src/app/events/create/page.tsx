@@ -25,15 +25,29 @@ function CreateEventContent() {
   const { user } = useAuth();
   const router = useRouter();
   
+  // Get current date and time for defaults
+  const now = new Date();
+  const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+  
+  // Format date as YYYY-MM-DD
+  const formatDate = (date: Date) => {
+    return date.toISOString().split('T')[0];
+  };
+  
+  // Format time as HH:MM
+  const formatTime = (date: Date) => {
+    return date.toTimeString().split(' ')[0].substring(0, 5);
+  };
+  
   // Event details state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [venue, setVenue] = useState('');
   const [address, setAddress] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [endTime, setEndTime] = useState('');
+  const [startDate, setStartDate] = useState(formatDate(now));
+  const [startTime, setStartTime] = useState(formatTime(now));
+  const [endDate, setEndDate] = useState(formatDate(oneHourLater));
+  const [endTime, setEndTime] = useState(formatTime(oneHourLater));
   
   // Cover image state
   const [coverImage, setCoverImage] = useState<File | null>(null);
@@ -165,8 +179,8 @@ function CreateEventContent() {
     
     if (!user) return;
     
-    // Final validation
-    if (!name.trim() || !description.trim() || !venue.trim() || 
+    // Final validation - venue is now optional
+    if (!name.trim() || !description.trim() || 
         !startDate || !startTime || !endDate || !endTime) {
       setError('Please fill in all required fields');
       return;
@@ -195,7 +209,7 @@ function CreateEventContent() {
         name: name.trim(),
         description: description.trim(),
         location: {
-          venue: venue.trim(),
+          venue: venue.trim() || 'TBD', // Default value if empty
           address: address.trim(),
           ...(location && { 
             latitude: location.latitude,
@@ -392,7 +406,7 @@ function CreateEventContent() {
             <div className="bg-white rounded-lg shadow p-4">
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Venue Name*
+                  Venue Name <span className="text-gray-500 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -406,7 +420,7 @@ function CreateEventContent() {
               
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Address
+                  Address <span className="text-gray-500 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"

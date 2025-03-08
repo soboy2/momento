@@ -68,49 +68,31 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Create a metadata object with CORS settings
+    // Create a metadata object
     const metadata = {
-      contentType: file.type,
-      customMetadata: {
-        'Access-Control-Allow-Origin': '*',
-      }
+      contentType: file.type
     };
     
-    try {
-      // Upload the file to Firebase Storage
-      const storageRef = ref(storage, path);
-      const snapshot = await uploadBytes(storageRef, file, metadata);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      
-      return NextResponse.json(
-        { success: true, url: downloadURL },
-        {
-          status: 200,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          },
-        }
-      );
-    } catch (uploadError) {
-      console.error('Firebase Storage upload error:', uploadError);
-      return NextResponse.json(
-        { success: false, error: 'Firebase Storage upload failed' },
-        {
-          status: 500,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          },
-        }
-      );
-    }
-  } catch (error) {
-    console.error('Error processing upload request:', error);
+    // Upload the file to Firebase Storage
+    const storageRef = ref(storage, path);
+    const snapshot = await uploadBytes(storageRef, file, metadata);
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
     return NextResponse.json(
-      { success: false, error: 'Failed to process upload request' },
+      { success: true, url: downloadURL },
+      {
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+      }
+    );
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    return NextResponse.json(
+      { success: false, error: String(error) },
       {
         status: 500,
         headers: {
