@@ -15,6 +15,7 @@ import {
   deleteDoc,
   query,
   where,
+  setDoc,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -449,6 +450,44 @@ export const uploadFile = async (file: File, path: string) => {
     return { success: true, url: downloadURL };
   } catch (error) {
     console.error("Error uploading file:", error);
+    return { success: false, error };
+  }
+};
+
+// User profile functions
+export const getUserProfile = async (userId: string) => {
+  try {
+    const docRef = doc(db, 'userProfiles', userId);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return { success: true, data: docSnap.data() };
+    } else {
+      // Create a default profile if it doesn't exist
+      const defaultProfile = {
+        coverPhoto: '',
+        bio: '',
+        location: '',
+        website: '',
+        joinedDate: new Date().toISOString(),
+      };
+      
+      await setDoc(docRef, defaultProfile);
+      return { success: true, data: defaultProfile };
+    }
+  } catch (error) {
+    console.error('Error getting user profile:', error);
+    return { success: false, error };
+  }
+};
+
+export const updateUserProfile = async (userId: string, data: any) => {
+  try {
+    const docRef = doc(db, 'userProfiles', userId);
+    await setDoc(docRef, data, { merge: true });
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating user profile:', error);
     return { success: false, error };
   }
 };
