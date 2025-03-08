@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { uploadFile, updateUserProfile } from '../lib/firebase/firebaseUtils';
 import { useAuth } from '../lib/hooks/useAuth';
+import { Camera } from 'lucide-react';
 
 interface CoverPhotoUploadProps {
   currentCoverPhoto?: string;
@@ -16,7 +17,9 @@ export default function CoverPhotoUpload({ currentCoverPhoto, onCoverPhotoChange
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
-  const handleEditClick = () => {
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
@@ -102,9 +105,10 @@ export default function CoverPhotoUpload({ currentCoverPhoto, onCoverPhotoChange
       <button 
         onClick={handleEditClick}
         disabled={uploading}
-        className="absolute bottom-2 right-2 bg-white bg-opacity-80 text-gray-700 px-3 py-1 rounded-full text-xs font-medium hover:bg-opacity-100 transition"
+        className="absolute bottom-2 right-2 bg-white hover:bg-gray-100 text-gray-700 px-4 py-2 rounded-full text-sm font-medium shadow-md z-10 flex items-center"
         type="button"
       >
+        <Camera size={16} className="mr-2" />
         {uploading ? 'Uploading...' : 'Edit Cover'}
       </button>
       

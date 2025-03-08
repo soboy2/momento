@@ -11,6 +11,7 @@ import Navigation from '../../components/Navigation';
 import { useRouter } from 'next/navigation';
 import CoverPhotoUpload from '../../components/CoverPhotoUpload';
 import EditableField from '../../components/EditableField';
+import LocationAutocomplete from '../../components/LocationAutocomplete';
 
 interface PostData {
   id: string;
@@ -207,11 +208,9 @@ function ProfileContent() {
               <p className="text-gray-600">{user.email}</p>
               
               <div className="mt-3 space-y-2">
-                {/* Editable Location */}
-                <EditableField 
+                {/* Location with Autocomplete */}
+                <LocationAutocomplete 
                   value={userProfile.location || ''}
-                  placeholder="Add your location"
-                  icon={<MapPin className="h-4 w-4" />}
                   onSave={(value) => handleProfileUpdate('location', value)}
                 />
                 
