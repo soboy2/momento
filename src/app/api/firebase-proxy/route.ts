@@ -55,7 +55,17 @@ export async function POST(request: NextRequest) {
     const path = formData.get('path') as string;
     
     if (!file || !path) {
-      return NextResponse.json({ error: 'File and path are required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'File and path are required' }, 
+        { 
+          status: 400,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
+        }
+      );
     }
     
     // Create a metadata object with CORS settings
@@ -66,26 +76,41 @@ export async function POST(request: NextRequest) {
       }
     };
     
-    // Upload the file to Firebase Storage
-    const storageRef = ref(storage, path);
-    const snapshot = await uploadBytes(storageRef, file, metadata);
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    
-    return NextResponse.json(
-      { success: true, url: downloadURL },
-      {
-        status: 200,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        },
-      }
-    );
+    try {
+      // Upload the file to Firebase Storage
+      const storageRef = ref(storage, path);
+      const snapshot = await uploadBytes(storageRef, file, metadata);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      return NextResponse.json(
+        { success: true, url: downloadURL },
+        {
+          status: 200,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          },
+        }
+      );
+    } catch (uploadError) {
+      console.error('Firebase Storage upload error:', uploadError);
+      return NextResponse.json(
+        { success: false, error: 'Firebase Storage upload failed' },
+        {
+          status: 500,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          },
+        }
+      );
+    }
   } catch (error) {
-    console.error('Error uploading file:', error);
+    console.error('Error processing upload request:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to upload file' },
+      { success: false, error: 'Failed to process upload request' },
       {
         status: 500,
         headers: {

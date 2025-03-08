@@ -61,7 +61,7 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: "/api/:path*",
+        source: "/api/openai/:path*",
         destination: "https://api.openai.com/:path*",
       },
       // Add a rewrite for Firebase Storage

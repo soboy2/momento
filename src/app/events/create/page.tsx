@@ -179,14 +179,19 @@ function CreateEventContent() {
       let coverImageURL = '';
       
       if (coverImage) {
-        const path = `events/${user.uid}/${Date.now()}_${coverImage.name}`;
-        coverImageURL = await uploadFile(coverImage, path);
+        try {
+          const path = `events/${user.uid}/${Date.now()}_${coverImage.name}`;
+          coverImageURL = await uploadFile(coverImage, path);
+        } catch (uploadError) {
+          console.error('Error uploading cover image:', uploadError);
+          // Continue with event creation even if image upload fails
+        }
       }
       
       const startDateTime = new Date(`${startDate}T${startTime}`);
       const endDateTime = new Date(`${endDate}T${endTime}`);
 
-      const eventId = await addDocument('events', {
+      const eventData: any = {
         name: name.trim(),
         description: description.trim(),
         location: {
@@ -201,7 +206,6 @@ function CreateEventContent() {
           start: startDateTime.toISOString(),
           end: endDateTime.toISOString()
         },
-        coverImage: coverImageURL,
         tags: tags,
         participantCount: 1, // Start with the creator
         postCount: 0,
@@ -211,12 +215,22 @@ function CreateEventContent() {
           photoURL: user.photoURL || ''
         }],
         createdBy: user.uid,
-        createdAt: new Date().toISOString(),
         visibility: 'public'
-      });
+      };
+      
+      // Only add coverImage if it was successfully uploaded
+      if (coverImageURL) {
+        eventData.coverImage = coverImageURL;
+      }
+
+      const result = await addDocument('events', eventData);
+      
+      if (!result.success) {
+        throw new Error(result.error ? result.error.toString() : 'Failed to create event');
+      }
 
       // Redirect to the new event page
-      router.push(`/events/${eventId}`);
+      router.push(`/events/${result.id}`);
     } catch (error) {
       console.error('Error creating event:', error);
       setError('Failed to create event. Please try again.');

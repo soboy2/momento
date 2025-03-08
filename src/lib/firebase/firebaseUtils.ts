@@ -461,13 +461,13 @@ export const uploadFile = async (file: File, path: string) => {
     const result = await response.json();
     
     if (result.success) {
-      return { success: true, url: result.url };
+      return result.url;
     } else {
       throw new Error(result.error || 'Upload failed');
     }
   } catch (error) {
     console.error("Error uploading file:", error);
-    return { success: false, error };
+    throw error; // Re-throw the error to be handled by the caller
   }
 };
 
