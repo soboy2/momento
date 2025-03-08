@@ -165,6 +165,15 @@ export default function LocationAutocomplete({ value, onSave }: LocationAutocomp
     setShowSuggestions(!showSuggestions);
   };
 
+  const handleBlur = () => {
+    setShowSuggestions(false);
+  };
+
+  const handleClearInput = () => {
+    setInputValue('');
+    setShowSuggestions(false);
+  };
+
   return (
     <div className="relative">
       <div className="flex items-center text-gray-600 group">
@@ -175,17 +184,25 @@ export default function LocationAutocomplete({ value, onSave }: LocationAutocomp
         {isEditing ? (
           <div className="flex items-center flex-1 relative">
             <div className="relative flex-1">
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputValue}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onFocus={() => setShowSuggestions(true)}
-                placeholder="Add your location"
-                className="flex-1 text-sm border-b border-blue-400 focus:outline-none py-1 pr-6 w-full"
-                autoComplete="off"
-              />
+              <div className="relative w-full">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputValue}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  onFocus={() => setShowSuggestions(true)}
+                  onBlur={handleBlur}
+                  placeholder="Add your location"
+                  className="w-full py-2 pr-10 border-b border-blue-400 focus:outline-none text-black"
+                />
+                <button
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400"
+                  onClick={handleClearInput}
+                >
+                  <MapPin size={18} />
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={toggleSuggestions}

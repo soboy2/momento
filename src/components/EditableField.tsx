@@ -58,17 +58,20 @@ export default function EditableField({ value, placeholder, icon, onSave }: Edit
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            className="flex-1 text-sm border-b border-blue-400 focus:outline-none py-1"
+            className="flex-1 text-sm border-b border-blue-400 focus:outline-none py-1 text-black"
+            autoFocus
           />
-          <button 
+          <button
             onClick={handleSave}
             className="ml-2 p-1 text-green-500 hover:bg-green-50 rounded-full"
+            aria-label="Save"
           >
             <Check size={16} />
           </button>
-          <button 
+          <button
             onClick={handleCancel}
             className="ml-1 p-1 text-red-500 hover:bg-red-50 rounded-full"
+            aria-label="Cancel"
           >
             <X size={16} />
           </button>

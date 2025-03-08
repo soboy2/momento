@@ -31,3 +31,10 @@ body {
     text-wrap: balance;
   }
 }
+
+/* Global styles for input fields */
+@layer base {
+  input, textarea, select {
+    color: black !important;
+  }
+}
