@@ -65,7 +65,7 @@ export default function EventCard({
             />
           )}
           <div className="absolute inset-0 bg-black bg-opacity-20"></div>
-          <div className="absolute bottom-3 right-3 bg-white bg-opacity-90 px-2 py-1 rounded text-xs font-medium">
+          <div className="absolute bottom-3 right-3 bg-blue-600 text-white px-3 py-1.5 rounded-full text-sm font-medium shadow-md">
             {postCount} {postCount === 1 ? 'post' : 'posts'}
           </div>
         </div>
