@@ -48,6 +48,7 @@ function CreateEventContent() {
   const [startTime, setStartTime] = useState(formatTime(now));
   const [endDate, setEndDate] = useState(formatDate(oneHourLater));
   const [endTime, setEndTime] = useState(formatTime(oneHourLater));
+  const [isPublic, setIsPublic] = useState(true);
   
   // Cover image state
   const [coverImage, setCoverImage] = useState<File | null>(null);
@@ -201,6 +202,9 @@ function CreateEventContent() {
       const startDateTime = new Date(`${startDate}T${startTime}`);
       const endDateTime = new Date(`${endDate}T${endTime}`);
 
+      // Generate a unique access code for private events
+      const accessCode = !isPublic ? generateAccessCode() : null;
+
       const eventData: any = {
         name: name.trim(),
         description: description.trim(),
@@ -225,7 +229,8 @@ function CreateEventContent() {
           photoURL: user.photoURL || ''
         }],
         createdBy: user.uid,
-        visibility: 'public'
+        visibility: isPublic ? 'public' : 'private',
+        ...(accessCode && { accessCode })
       };
       
       // Only add coverImage if it was successfully uploaded
@@ -246,6 +251,16 @@ function CreateEventContent() {
       setError('Failed to create event. Please try again.');
       setIsSubmitting(false);
     }
+  };
+
+  // Generate a random access code for private events
+  const generateAccessCode = () => {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
   };
 
   return (
@@ -495,90 +510,74 @@ function CreateEventContent() {
             </div>
           )}
           
-          {/* Step 3: Review & Create */}
+          {/* Step 3: Finalize */}
           {currentStep === 3 && (
             <div className="bg-white rounded-lg shadow p-4">
-              <h2 className="text-lg font-semibold mb-4">Review Event Details</h2>
-              
-              <div className="mb-6">
-                {coverImagePreview && (
-                  <div className="relative w-full h-48 mb-4">
-                    <Image 
-                      src={coverImagePreview} 
-                      alt="Cover Preview" 
-                      fill 
-                      className="object-cover rounded-lg"
+              <div className="mb-4">
+                <h3 className="text-lg font-medium mb-2">Event Visibility</h3>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="public"
+                      name="visibility"
+                      className="h-4 w-4 text-blue-600"
+                      checked={isPublic}
+                      onChange={() => setIsPublic(true)}
+                      disabled={isSubmitting}
                     />
+                    <label htmlFor="public" className="ml-2 text-sm text-gray-700">
+                      Public (visible to everyone)
+                    </label>
                   </div>
-                )}
-                
-                <h3 className="text-xl font-bold mb-1">{name}</h3>
-                <p className="text-gray-600 mb-4">{description}</p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div className="flex items-start">
-                    <MapPin className="h-5 w-5 text-gray-500 mt-0.5 mr-3 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">{venue}</p>
-                      {address && <p className="text-sm text-gray-500">{address}</p>}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-start">
-                    <Calendar className="h-5 w-5 text-gray-500 mt-0.5 mr-3 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">
-                        {startDate && new Date(startDate).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {startTime && new Date(`2000-01-01T${startTime}`).toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit'
-                        })}
-                        {' - '}
-                        {endTime && new Date(`2000-01-01T${endTime}`).toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit'
-                        })}
-                      </p>
-                    </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="private"
+                      name="visibility"
+                      className="h-4 w-4 text-blue-600"
+                      checked={!isPublic}
+                      onChange={() => setIsPublic(false)}
+                      disabled={isSubmitting}
+                    />
+                    <label htmlFor="private" className="ml-2 text-sm text-gray-700">
+                      Private (invite only)
+                    </label>
                   </div>
                 </div>
-                
-                {tags.length > 0 && (
-                  <div className="mb-4">
-                    <p className="text-sm font-medium text-gray-700 mb-1">Tags:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {tags.map((tag, index) => (
-                        <span key={index} className="bg-gray-100 px-2 py-1 rounded-full text-sm">
-                          {tag}
-                        </span>
-                      ))}
+                {!isPublic && (
+                  <p className="mt-2 text-sm text-gray-500">
+                    A unique link will be generated for you to share with invited participants.
+                  </p>
+                )}
+              </div>
+              
+              <div className="mb-4">
+                <h3 className="text-lg font-medium mb-2">Review Event Details</h3>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="font-medium">{name}</p>
+                  <p className="text-sm text-gray-600 mt-1">{description}</p>
+                  <div className="mt-2 text-sm text-gray-500">
+                    <div className="flex items-center mt-1">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      <span>{startDate} {startTime} - {endDate} {endTime}</span>
+                    </div>
+                    <div className="flex items-center mt-1">
+                      <MapPin className="h-4 w-4 mr-2" />
+                      <span>{venue || 'TBD'}</span>
                     </div>
                   </div>
-                )}
-                
-                <div className="bg-blue-50 p-3 rounded-lg flex items-start">
-                  <Info className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
-                  <p className="text-sm text-blue-700">
-                    You&apos;ll be automatically added as a participant when you create this event.
-                    Others can join by viewing the event and clicking &quot;Join&quot;.
-                  </p>
                 </div>
               </div>
+              
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg">
+                  {error}
+                </div>
+              )}
             </div>
           )}
 
-          {error && (
-            <div className="p-3 bg-red-100 text-red-700 rounded-lg">
-              {error}
-            </div>
-          )}
-          
           <div className="flex justify-between">
             {currentStep > 1 ? (
               <button

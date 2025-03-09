@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { AuthProvider } from '../../../lib/contexts/AuthContext';
+import { useAuth } from '../../../lib/hooks/useAuth';
 import Navigation from '../../../components/Navigation';
 import Post from '../../../components/Post';
 import EventHeatmap from '../../../components/EventHeatmap';
@@ -35,6 +36,9 @@ interface EventData {
     name: string;
     photoURL: string;
   }>;
+  createdBy: string;
+  visibility: 'public' | 'private';
+  accessCode?: string;
 }
 
 interface PostData {
@@ -75,22 +79,47 @@ export default function EventPage() {
 function EventContent() {
   const params = useParams();
   const eventId = params.id as string;
-  
+  const { user } = useAuth();
   const [event, setEvent] = useState<EventData | null>(null);
   const [posts, setPosts] = useState<PostData[]>([]);
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'map'>('list');
   const [loading, setLoading] = useState(true);
   const [coverImageError, setCoverImageError] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [accessCode, setAccessCode] = useState<string | null>(null);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
   
   useEffect(() => {
-    const fetchEventData = async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch event details
+        // Fetch event data
         const eventData = await getDocument('events', eventId) as EventData;
-        if (eventData) {
-          setEvent(eventData);
-          
+        if (!eventData) {
+          setLoading(false);
+          return;
+        }
+        
+        setEvent(eventData);
+        
+        // Check if user has access to this event
+        const isCreator = user && eventData.createdBy === user.uid;
+        const isParticipant = user && eventData.participants.some(p => p.id === user.uid);
+        const isPublic = eventData.visibility === 'public';
+        
+        // Get access code from URL if present
+        const urlParams = new URLSearchParams(window.location.search);
+        const codeFromUrl = urlParams.get('code');
+        
+        // Determine if user has access
+        const userHasAccess = isPublic || isCreator || isParticipant || 
+                             (codeFromUrl && eventData.accessCode === codeFromUrl);
+        
+        setHasAccess(userHasAccess ? true : false);
+        
+        // If user has access, fetch posts
+        if (userHasAccess) {
           // Fetch posts for this event
           const allPosts = await getDocuments('posts') as PostData[];
           const eventPosts = allPosts.filter(post => post.eventId === eventId);
@@ -102,15 +131,18 @@ function EventContent() {
           
           setPosts(sortedPosts);
         }
+        
+        setLoading(false);
       } catch (error) {
         console.error('Error fetching event data:', error);
-      } finally {
         setLoading(false);
       }
     };
     
-    fetchEventData();
-  }, [eventId]);
+    if (eventId && user) {
+      fetchData();
+    }
+  }, [eventId, user]);
   
   if (loading) {
     return (
@@ -180,6 +212,57 @@ function EventContent() {
         },
         timestamp: post.captureTimestamp || post.createdAt
       }));
+  };
+  
+  const handleShareEvent = () => {
+    setShowShareModal(true);
+  };
+  
+  const handleAccessCodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!event || !accessCode) return;
+    
+    if (accessCode === event.accessCode) {
+      setHasAccess(true);
+      setAccessError(null);
+      
+      // Update URL with access code
+      const url = new URL(window.location.href);
+      url.searchParams.set('code', accessCode);
+      window.history.replaceState({}, '', url.toString());
+      
+      // Fetch posts now that we have access
+      fetchData();
+    } else {
+      setAccessError('Invalid access code. Please try again.');
+    }
+  };
+  
+  const fetchData = async () => {
+    try {
+      // Fetch posts for this event
+      const allPosts = await getDocuments('posts') as PostData[];
+      const eventPosts = allPosts.filter(post => post.eventId === eventId);
+      
+      // Sort posts by creation date (newest first)
+      const sortedPosts = eventPosts.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      
+      setPosts(sortedPosts);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+    }
+  };
+  
+  // Generate shareable link with access code
+  const getShareableLink = () => {
+    if (!event || !event.accessCode) return '';
+    
+    const url = new URL(window.location.href);
+    url.searchParams.set('code', event.accessCode);
+    return url.toString();
   };
   
   return (
@@ -425,6 +508,67 @@ function EventContent() {
           >
             <Camera className="h-6 w-6" />
           </Link>
+        </div>
+      )}
+      
+      {/* Share Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-xl font-bold mb-4">Share Event</h3>
+            
+            {event.visibility === 'private' && (
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-2">
+                  This is a private event. Share this link with people you want to invite:
+                </p>
+                <div className="flex">
+                  <input
+                    type="text"
+                    readOnly
+                    value={getShareableLink()}
+                    className="flex-1 p-2 border border-gray-300 rounded-l-lg text-sm focus:outline-none"
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(getShareableLink());
+                      alert('Link copied to clipboard!');
+                    }}
+                    className="bg-blue-600 text-white px-3 py-2 rounded-r-lg text-sm"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">
+                Or share via:
+              </p>
+              <div className="flex space-x-4">
+                <button className="bg-blue-600 text-white p-2 rounded-full">
+                  <span className="sr-only">Facebook</span>
+                  {/* Facebook icon would go here */}
+                </button>
+                <button className="bg-blue-400 text-white p-2 rounded-full">
+                  <span className="sr-only">Twitter</span>
+                  {/* Twitter icon would go here */}
+                </button>
+                <button className="bg-green-500 text-white p-2 rounded-full">
+                  <span className="sr-only">WhatsApp</span>
+                  {/* WhatsApp icon would go here */}
+                </button>
+              </div>
+            </div>
+            
+            <button
+              onClick={() => setShowShareModal(false)}
+              className="w-full bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
     </div>

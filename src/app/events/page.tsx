@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { AuthProvider } from '../../lib/contexts/AuthContext';
+import { useAuth } from '../../lib/hooks/useAuth';
 import Navigation from '../../components/Navigation';
 import EventCard from '../../components/EventCard';
 import { Search, Filter, MapPin, Calendar, X, Plus } from 'lucide-react';
@@ -28,6 +29,9 @@ interface EventData {
     name: string;
     photoURL: string;
   }>;
+  createdBy: string;
+  visibility: 'public' | 'private';
+  accessCode?: string;
 }
 
 export default function EventsPage() {
@@ -39,6 +43,7 @@ export default function EventsPage() {
 }
 
 function EventsContent() {
+  const { user } = useAuth();
   const [events, setEvents] = useState<EventData[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,17 +59,35 @@ function EventsContent() {
       setLoading(true);
       try {
         const eventsData = await getDocuments('events') as EventData[];
-        setEvents(eventsData);
-        setFilteredEvents(eventsData);
+        
+        // Filter out private events that the user doesn't have access to
+        const accessibleEvents = eventsData.filter(event => {
+          // Public events are accessible to everyone
+          if (event.visibility === 'public') return true;
+          
+          // Private events are only accessible to the creator and participants
+          if (user && (
+              event.createdBy === user.uid || 
+              event.participants.some(p => p.id === user.uid)
+          )) {
+            return true;
+          }
+          
+          // Otherwise, the user doesn't have access to this private event
+          return false;
+        });
+        
+        setEvents(accessibleEvents);
+        setFilteredEvents(accessibleEvents);
+        setLoading(false);
       } catch (error) {
         console.error('Error fetching events:', error);
-      } finally {
         setLoading(false);
       }
     };
-
+    
     fetchEvents();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     // Apply filters and search

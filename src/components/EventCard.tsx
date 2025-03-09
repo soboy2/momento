@@ -20,6 +20,7 @@ interface EventCardProps {
   coverImage?: string;
   participantCount: number;
   postCount: number;
+  visibility?: 'public' | 'private';
 }
 
 export default function EventCard({
@@ -30,7 +31,8 @@ export default function EventCard({
   timeRange,
   coverImage,
   participantCount,
-  postCount
+  postCount,
+  visibility = 'public'
 }: EventCardProps) {
   const [imageError, setImageError] = useState(false);
   
@@ -68,6 +70,12 @@ export default function EventCard({
           <div className="absolute bottom-3 right-3 bg-blue-600 text-white px-3 py-1.5 rounded-full text-sm font-medium shadow-md">
             {postCount} {postCount === 1 ? 'post' : 'posts'}
           </div>
+          
+          {visibility === 'private' && (
+            <div className="absolute top-3 left-3 bg-purple-600 text-white px-3 py-1.5 rounded-full text-sm font-medium shadow-md">
+              Private
+            </div>
+          )}
         </div>
         
         {/* Content */}
