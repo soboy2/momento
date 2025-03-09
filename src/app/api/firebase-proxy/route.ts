@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { app } from '../../../lib/firebase/firebase';
 
 // Initialize Firebase Storage
 const storage = getStorage(app);
+
+// Configure max upload size (5MB)
+const MAX_UPLOAD_SIZE = 5 * 1024 * 1024; // 5MB
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
@@ -89,6 +92,22 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Check file size
+    if (file.size > MAX_UPLOAD_SIZE) {
+      console.error(`File size (${file.size} bytes) exceeds maximum allowed size (${MAX_UPLOAD_SIZE} bytes)`);
+      return NextResponse.json(
+        { success: false, error: `File size exceeds maximum allowed size of ${MAX_UPLOAD_SIZE / (1024 * 1024)}MB` }, 
+        { 
+          status: 400,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+          }
+        }
+      );
+    }
+    
     console.log(`Uploading file: ${file.name}, size: ${file.size}, type: ${file.type}, to path: ${path}`);
     
     // Create a metadata object
@@ -97,39 +116,72 @@ export async function POST(request: NextRequest) {
     };
     
     try {
+      // Convert File to ArrayBuffer for more reliable upload
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      
       // Create a reference to the storage location
       const storageRef = ref(storage, path);
       
-      // Upload the file
-      console.log('Starting upload to Firebase Storage');
-      const snapshot = await uploadBytes(storageRef, file, metadata);
-      console.log('File uploaded successfully, getting download URL');
+      // Try different upload methods
+      let downloadURL;
+      let uploadSuccess = false;
       
-      // Get the download URL
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      console.log('Download URL obtained:', downloadURL);
-      
-      // Return success response
-      return NextResponse.json(
-        { success: true, url: downloadURL },
-        {
-          status: 200,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-          },
+      // First try: Use resumable upload
+      try {
+        console.log('Starting resumable upload to Firebase Storage');
+        const snapshot = await uploadBytesResumable(storageRef, bytes, metadata);
+        console.log('Resumable upload successful, getting download URL');
+        downloadURL = await getDownloadURL(snapshot.ref);
+        uploadSuccess = true;
+      } catch (resumableError) {
+        console.error('Resumable upload failed, trying standard upload:', resumableError);
+        
+        // Second try: Use standard upload
+        try {
+          console.log('Starting standard upload to Firebase Storage');
+          const snapshot = await uploadBytes(storageRef, bytes, metadata);
+          console.log('Standard upload successful, getting download URL');
+          downloadURL = await getDownloadURL(snapshot.ref);
+          uploadSuccess = true;
+        } catch (standardError) {
+          console.error('Standard upload failed:', standardError);
+          throw standardError; // Re-throw to be caught by outer catch
         }
-      );
+      }
+      
+      if (uploadSuccess && downloadURL) {
+        console.log('Download URL obtained:', downloadURL);
+        
+        // Return success response
+        return NextResponse.json(
+          { success: true, url: downloadURL },
+          {
+            status: 200,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type',
+            },
+          }
+        );
+      } else {
+        throw new Error('Upload completed but no download URL was obtained');
+      }
     } catch (uploadError: any) {
       // Log the specific Firebase error
-      console.error('Firebase Storage upload error:', uploadError.code, uploadError.message);
+      console.error('Firebase Storage upload error:', uploadError);
+      console.error('Error code:', uploadError.code);
+      console.error('Error message:', uploadError.message);
+      console.error('Error details:', uploadError.serverResponse || 'No server response');
+      
       return NextResponse.json(
         { 
           success: false, 
           error: 'Firebase Storage upload failed', 
           details: uploadError.message,
-          code: uploadError.code
+          code: uploadError.code,
+          serverResponse: uploadError.serverResponse
         },
         {
           status: 500,
@@ -143,12 +195,18 @@ export async function POST(request: NextRequest) {
     }
   } catch (error: any) {
     // Log the general error
-    console.error('Error processing upload request:', error.message);
+    console.error('Error processing upload request:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
     return NextResponse.json(
       { 
         success: false, 
         error: 'Failed to process upload request',
-        details: error.message
+        details: error.message,
+        name: error.name,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       },
       {
         status: 500,

@@ -453,38 +453,75 @@ export const uploadFile = async (file: File, path: string) => {
     
     console.log('Sending request to Firebase proxy API');
     
-    // Send the request to our proxy API
-    const response = await fetch('/api/firebase-proxy', {
-      method: 'POST',
-      body: formData,
-    });
+    // Send the request to our proxy API with a timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
-    // Get the response as text first for debugging
-    const responseText = await response.text();
-    console.log(`Response status: ${response.status}, Response text:`, responseText);
-    
-    // Parse the response as JSON
-    let result;
     try {
-      result = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('Error parsing response:', parseError);
-      throw new Error(`Invalid response format: ${responseText}`);
-    }
-    
-    // Check if the request was successful
-    if (!response.ok) {
-      console.error('Upload failed with status:', response.status, result);
-      throw new Error(result.error || `Upload failed with status: ${response.status}`);
-    }
-    
-    // Check if the result indicates success
-    if (result.success && result.url) {
-      console.log('Upload successful, URL:', result.url);
-      return result.url;
-    } else {
-      console.error('Upload failed:', result);
-      throw new Error(result.error || 'Upload failed with unknown error');
+      const response = await fetch('/api/firebase-proxy', {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // Get the response as text first for debugging
+      const responseText = await response.text();
+      console.log(`Response status: ${response.status}, Response text:`, responseText);
+      
+      // Parse the response as JSON
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        throw new Error(`Invalid response format: ${responseText}`);
+      }
+      
+      // Check if the request was successful
+      if (!response.ok) {
+        console.error('Upload failed with status:', response.status, result);
+        
+        // Create a detailed error message
+        let errorMessage = result.error || `Upload failed with status: ${response.status}`;
+        if (result.details) {
+          errorMessage += ` - ${result.details}`;
+        }
+        if (result.code) {
+          errorMessage += ` (${result.code})`;
+        }
+        
+        const error = new Error(errorMessage);
+        // @ts-ignore - Add additional properties to the error
+        error.status = response.status;
+        // @ts-ignore
+        error.code = result.code;
+        // @ts-ignore
+        error.details = result.details;
+        // @ts-ignore
+        error.serverResponse = result.serverResponse;
+        
+        throw error;
+      }
+      
+      // Check if the result indicates success
+      if (result.success && result.url) {
+        console.log('Upload successful, URL:', result.url);
+        return result.url;
+      } else {
+        console.error('Upload failed:', result);
+        throw new Error(result.error || 'Upload failed with unknown error');
+      }
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError.name === 'AbortError') {
+        console.error('Upload request timed out');
+        throw new Error('Upload request timed out. Please try again.');
+      }
+      
+      throw fetchError;
     }
   } catch (error) {
     console.error("Error in uploadFile:", error);
