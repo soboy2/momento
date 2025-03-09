@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { AuthProvider } from '../../../lib/contexts/AuthContext';
 import { useAuth } from '../../../lib/hooks/useAuth';
@@ -11,10 +11,12 @@ import EventHeatmap from '../../../components/EventHeatmap';
 import { 
   MapPin, Calendar, Users, Clock, Share2, 
   Camera, Grid, List, Map, ChevronLeft, 
-  Plus, MoreHorizontal, Bookmark
+  Plus, MoreHorizontal, Bookmark, Trash2
 } from 'lucide-react';
 import Link from 'next/link';
-import { getDocument, getDocuments } from '../../../lib/firebase/firebaseUtils';
+import { getDocument, getDocuments, deleteDocument } from '../../../lib/firebase/firebaseUtils';
+import ConfirmationModal from '../../../components/ConfirmationModal';
+import { toast } from 'react-hot-toast';
 
 interface EventData {
   id: string;
@@ -80,6 +82,7 @@ function EventContent() {
   const params = useParams();
   const eventId = params.id as string;
   const { user } = useAuth();
+  const router = useRouter();
   const [event, setEvent] = useState<EventData | null>(null);
   const [posts, setPosts] = useState<PostData[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'map'>('list');
@@ -89,6 +92,8 @@ function EventContent() {
   const [accessCode, setAccessCode] = useState<string | null>(null);
   const [hasAccess, setHasAccess] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   useEffect(() => {
     const fetchData = async () => {
@@ -265,6 +270,30 @@ function EventContent() {
     return url.toString();
   };
   
+  const handleDeleteEvent = async () => {
+    if (!user || !event) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      // Delete the event
+      const result = await deleteDocument('events', eventId);
+      
+      if (!result.success) {
+        throw new Error(result.error ? result.error.toString() : 'Failed to delete event');
+      }
+      
+      toast.success('Event deleted successfully');
+      
+      // Redirect to events page
+      router.push('/events');
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      toast.error('Failed to delete event. Please try again.');
+      setIsDeleting(false);
+    }
+  };
+  
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
@@ -326,6 +355,39 @@ function EventContent() {
                   <p className="text-sm text-gray-500">{event.location.address}</p>
                 </div>
               </div>
+            </div>
+            
+            {/* Action buttons */}
+            <div className="flex flex-wrap gap-2 mb-6">
+              <button 
+                onClick={handleShareEvent}
+                className="flex items-center px-3 py-1.5 bg-gray-100 rounded-full text-sm"
+              >
+                <Share2 className="h-4 w-4 mr-1" />
+                Share
+              </button>
+              <button className="flex items-center px-3 py-1.5 bg-gray-100 rounded-full text-sm">
+                <Bookmark className="h-4 w-4 mr-1" />
+                Save
+              </button>
+              {user && event.createdBy === user.uid && (
+                <>
+                  <Link 
+                    href={`/events/${eventId}/edit`}
+                    className="flex items-center px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm"
+                  >
+                    <MoreHorizontal className="h-4 w-4 mr-1" />
+                    Edit Event
+                  </Link>
+                  <button 
+                    onClick={() => setShowDeleteModal(true)}
+                    className="flex items-center px-3 py-1.5 bg-red-100 text-red-700 rounded-full text-sm"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete
+                  </button>
+                </>
+              )}
             </div>
             
             {/* Participants */}
@@ -571,6 +633,19 @@ function EventContent() {
           </div>
         </div>
       )}
+      
+      {/* Delete confirmation modal */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        title="Delete Event"
+        message="Are you sure you want to delete this event? This action cannot be undone."
+        confirmText="Delete Event"
+        cancelText="Cancel"
+        onConfirm={handleDeleteEvent}
+        onCancel={() => setShowDeleteModal(false)}
+        isLoading={isDeleting}
+        variant="danger"
+      />
     </div>
   );
 } 

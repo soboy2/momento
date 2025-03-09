@@ -3,10 +3,13 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Heart, MessageCircle, Send, MapPin, Tag, Calendar } from 'lucide-react';
+import { Heart, MessageCircle, Send, MapPin, Tag, Calendar, Edit, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../lib/hooks/useAuth';
-import { updateDocument } from '../lib/firebase/firebaseUtils';
+import { updateDocument, deleteDocument, getDocument } from '../lib/firebase/firebaseUtils';
+import { useRouter } from 'next/navigation';
+import ConfirmationModal from './ConfirmationModal';
+import { toast } from 'react-hot-toast';
 
 interface Comment {
   id: string;
@@ -70,6 +73,9 @@ export default function Post({ post }: PostProps) {
   const [localComments, setLocalComments] = useState(comments);
   const [imageError, setImageError] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
+  const router = useRouter();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleLike = async () => {
     if (!user) return;
@@ -106,6 +112,45 @@ export default function Post({ post }: PostProps) {
     await updateDocument('posts', id, { 
       comments: [...localComments, comment] 
     });
+  };
+
+  const handleDelete = async () => {
+    if (!user) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      // Delete the post
+      const result = await deleteDocument('posts', id);
+      
+      if (!result.success) {
+        throw new Error(result.error ? result.error.toString() : 'Failed to delete post');
+      }
+      
+      toast.success('Post deleted successfully');
+      
+      // If the post is on an event page, update the event's post count
+      if (eventId) {
+        try {
+          const eventData = await getDocument('events', eventId) as any;
+          if (eventData && eventData.postCount > 0) {
+            await updateDocument('events', eventId, {
+              postCount: eventData.postCount - 1
+            });
+          }
+        } catch (error) {
+          console.error('Error updating event post count:', error);
+          // Continue even if event update fails
+        }
+      }
+      
+      // Refresh the page to show the updated list
+      router.refresh();
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      toast.error('Failed to delete post. Please try again.');
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -196,11 +241,29 @@ export default function Post({ post }: PostProps) {
         </button>
         <button 
           onClick={() => setShowComments(!showComments)}
-          className="flex items-center text-gray-500"
+          className="flex items-center text-gray-500 mr-4"
         >
           <MessageCircle className="h-6 w-6 mr-1" />
           <span className="text-sm">{localComments.length}</span>
         </button>
+        {user && userId === user.uid && (
+          <>
+            <Link 
+              href={`/posts/${id}/edit`}
+              className="flex items-center text-gray-500 mr-4"
+            >
+              <Edit className="h-5 w-5 mr-1" />
+              <span className="text-sm">Edit</span>
+            </Link>
+            <button 
+              onClick={() => setShowDeleteModal(true)}
+              className="flex items-center text-gray-500"
+            >
+              <Trash2 className="h-5 w-5 mr-1" />
+              <span className="text-sm">Delete</span>
+            </button>
+          </>
+        )}
       </div>
 
       {/* Comments section */}
@@ -242,6 +305,19 @@ export default function Post({ post }: PostProps) {
           </form>
         </div>
       )}
+
+      {/* Delete confirmation modal */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        title="Delete Post"
+        message="Are you sure you want to delete this post? This action cannot be undone."
+        confirmText="Delete Post"
+        cancelText="Cancel"
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteModal(false)}
+        isLoading={isDeleting}
+        variant="danger"
+      />
     </div>
   );
 } 
