@@ -1,7 +1,5 @@
-'use client';
-
 import "./globals.css";
-import { Toaster } from "react-hot-toast";
+import ToasterProvider from "../components/ToasterProvider";
 import AuthWrapper from "../components/AuthWrapper";
 
 export const metadata = {
@@ -20,7 +18,7 @@ export default function RootLayout({
         <AuthWrapper>
           {children}
         </AuthWrapper>
-        <Toaster position="bottom-center" />
+        <ToasterProvider />
       </body>
     </html>
   );
