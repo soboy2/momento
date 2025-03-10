@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/hooks/useAuth';
 import { addDocument, uploadFile, getDocuments, updateDocument } from '../../lib/firebase/firebaseUtils';
 import { 
@@ -13,6 +13,7 @@ import { AuthProvider } from '../../lib/contexts/AuthContext';
 import Navigation from '../../components/Navigation';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
+import CreatePageWrapper from '../../components/CreatePageWrapper';
 
 // Define the Event interface
 interface EventData {
@@ -37,36 +38,33 @@ interface EventData {
   }>;
 }
 
-// Type guard function to check if an object is an EventData
+// Type guard for EventData
 function isEventData(obj: any): obj is EventData {
-  return obj && typeof obj === 'object' && 'name' in obj;
+  return obj && typeof obj.id === 'string' && typeof obj.name === 'string';
 }
 
 export default function CreatePostPage() {
   return (
     <AuthProvider>
-      <Suspense fallback={<LoadingState />}>
-        <CreatePostContent />
-      </Suspense>
+      <CreatePageWrapper>
+        {(eventId) => <CreatePostContent preselectedEventId={eventId} />}
+      </CreatePageWrapper>
     </AuthProvider>
   );
 }
 
-// Loading state component
 function LoadingState() {
   return (
     <div className="flex items-center justify-center min-h-screen">
-      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
       <span className="ml-2 text-lg">Loading...</span>
     </div>
   );
 }
 
-function CreatePostContent() {
+function CreatePostContent({ preselectedEventId }: { preselectedEventId: string | null }) {
   const { user } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const preselectedEventId = searchParams.get('eventId');
   
   const [text, setText] = useState('');
   const [image, setImage] = useState<File | null>(null);
@@ -79,6 +77,7 @@ function CreatePostContent() {
     latitude: number;
     longitude: number;
     accuracy: number;
+    altitude?: number;
   } | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventData | null>(null);

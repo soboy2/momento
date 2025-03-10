@@ -3,7 +3,7 @@
 import { useAuth } from '../../lib/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import SignInWithGoogle from '../../components/SignInWithGoogle';
+import SignInWithGoogleWrapper from '../../components/SignInWithGoogleWrapper';
 import { Toaster } from 'react-hot-toast';
 
 export default function LoginPage() {
@@ -25,11 +25,13 @@ function LoginContent() {
       router.push('/');
     }
     
-    // Check for auth error in URL query params
-    const urlParams = new URLSearchParams(window.location.search);
-    const error = urlParams.get('error');
-    if (error) {
-      setAuthError(decodeURIComponent(error));
+    // Check for auth error in URL query params - using window.location instead of useSearchParams
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const error = urlParams.get('error');
+      if (error) {
+        setAuthError(decodeURIComponent(error));
+      }
     }
   }, [user, loading, router]);
 
@@ -48,7 +50,7 @@ function LoginContent() {
         )}
         
         <div className="mt-8 space-y-6">
-          <SignInWithGoogle />
+          <SignInWithGoogleWrapper />
           
           <div className="mt-4 text-sm text-center text-gray-600">
             <p className="mb-2">
