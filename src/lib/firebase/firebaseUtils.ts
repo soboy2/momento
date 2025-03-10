@@ -352,13 +352,14 @@ export const signInWithGoogle = async () => {
     provider.addScope('profile');
     provider.addScope('email');
     
-    // Set custom parameters
+    // Set custom parameters - force account selection even when one account is available
     provider.setCustomParameters({
       prompt: 'select_account'
     });
     
     // Try to sign in with popup first
     try {
+      // Use a more direct approach without relying on window.closed checks
       const result = await signInWithPopup(auth, provider);
       
       // If successful, check if the user exists in the userProfiles collection
@@ -391,7 +392,8 @@ export const signInWithGoogle = async () => {
       if (
         popupError.code === 'auth/popup-closed-by-user' || 
         popupError.code === 'auth/popup-blocked' ||
-        popupError.code === 'auth/cancelled-popup-request'
+        popupError.code === 'auth/cancelled-popup-request' ||
+        popupError.code === 'auth/network-request-failed'
       ) {
         // Check if we're already handling a redirect
         try {
