@@ -85,6 +85,8 @@ export default function Post({ post }: PostProps) {
 
   // Track post views
   useEffect(() => {
+    let isMounted = true;
+    
     const incrementViewCount = async () => {
       if (!id) return;
       
@@ -93,9 +95,12 @@ export default function Post({ post }: PostProps) {
         const currentViews = post.views || 0;
         
         // Update the post with incremented view count
-        await updateDocument('posts', id, {
-          views: currentViews + 1
-        });
+        // Only proceed if component is still mounted
+        if (isMounted) {
+          await updateDocument('posts', id, {
+            views: currentViews + 1
+          });
+        }
         
         // We don't need to update local state since this is just for analytics
       } catch (error) {
@@ -110,6 +115,11 @@ export default function Post({ post }: PostProps) {
       incrementViewCount();
       sessionStorage.setItem('viewedPosts', JSON.stringify([...viewedPosts, id]));
     }
+    
+    // Cleanup function to prevent state updates on unmounted component
+    return () => {
+      isMounted = false;
+    };
   }, [id, post.views]);
 
   const handleLike = async () => {

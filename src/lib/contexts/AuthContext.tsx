@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useEffect, useState } from "react";
+import React, { createContext, useEffect, useState, useCallback } from "react";
 import Cookies from 'js-cookie';
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "../firebase/firebase";
@@ -30,7 +30,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Listen for auth state changes
   useEffect(() => {
+    let isMounted = true;
+    
     const unsubscribe = onAuthStateChanged(auth, (authUser) => {
+      if (!isMounted) return;
+      
       if (authUser) {
         setUser(authUser);
         // Set auth cookie with 7 days expiry
@@ -44,16 +48,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setLoading(false);
     }, (error) => {
+      if (!isMounted) return;
+      
       console.error("Auth state change error:", error);
       setAuthError(error.message);
       setLoading(false);
     });
 
     // Cleanup subscription
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
   
-  const signInWithGoogle = async () => {
+  // Use useCallback to memoize the function and prevent unnecessary re-renders
+  const signInWithGoogle = useCallback(async () => {
     try {
       setAuthError(null);
       const result = await firebaseSignInWithGoogle();
@@ -83,9 +93,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAuthError(error.message || 'An unexpected error occurred');
       throw error;
     }
-  };
+  }, []);
 
-  const signOutUser = async () => {
+  // Use useCallback to memoize the function and prevent unnecessary re-renders
+  const signOutUser = useCallback(async () => {
     try {
       await firebaseSignOut();
       // Remove auth cookie
@@ -96,16 +107,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Error signing out:", error);
       toast.error('Failed to sign out. Please try again.');
     }
-  };
+  }, []);
+
+  // Memoize the context value to prevent unnecessary re-renders
+  const contextValue = React.useMemo(() => ({
+    user, 
+    loading, 
+    signInWithGoogle, 
+    signOut: signOutUser,
+    authError
+  }), [user, loading, signInWithGoogle, signOutUser, authError]);
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      signInWithGoogle, 
-      signOut: signOutUser,
-      authError
-    }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

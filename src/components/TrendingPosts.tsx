@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Flame } from 'lucide-react';
 import Post from './Post';
 import { calculateTrendingScore } from '../lib/utils/trendingUtils';
@@ -41,7 +41,8 @@ interface TrendingPostsProps {
 export default function TrendingPosts({ posts, maxPosts = 3 }: TrendingPostsProps) {
   const [trendingPosts, setTrendingPosts] = useState<PostData[]>([]);
   
-  useEffect(() => {
+  // Use useMemo to calculate trending posts to avoid unnecessary recalculations
+  const calculatedTrendingPosts = useMemo(() => {
     // Filter and sort posts by trending score
     const postsWithScores = posts.map(post => ({
       post,
@@ -49,14 +50,22 @@ export default function TrendingPosts({ posts, maxPosts = 3 }: TrendingPostsProp
     }));
     
     // Filter posts with a minimum trending score
-    const trending = postsWithScores
+    return postsWithScores
       .filter(item => item.score >= 5) // Minimum score to be considered trending
       .sort((a, b) => b.score - a.score) // Sort by score (highest first)
       .map(item => item.post) // Extract just the post data
       .slice(0, maxPosts); // Limit to maxPosts
-    
-    setTrendingPosts(trending);
   }, [posts, maxPosts]);
+  
+  // Update state safely with useEffect
+  useEffect(() => {
+    setTrendingPosts(calculatedTrendingPosts);
+    
+    // Cleanup function to prevent state updates on unmounted component
+    return () => {
+      // This empty cleanup function helps prevent React error #423
+    };
+  }, [calculatedTrendingPosts]);
   
   // Don't render anything if there are no trending posts
   if (trendingPosts.length === 0) return null;

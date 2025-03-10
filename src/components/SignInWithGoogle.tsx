@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '../lib/hooks/useAuth';
 import Image from 'next/image';
 import { toast } from 'react-hot-toast';
@@ -9,7 +9,10 @@ export default function SignInWithGoogle() {
   const { signInWithGoogle } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSignIn = async () => {
+  // Use useCallback to memoize the function and prevent unnecessary re-renders
+  const handleSignIn = useCallback(async () => {
+    if (isLoading) return; // Prevent multiple clicks
+    
     setIsLoading(true);
     try {
       await signInWithGoogle();
@@ -32,13 +35,14 @@ export default function SignInWithGoogle() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [signInWithGoogle, isLoading]);
 
   return (
     <button
       onClick={handleSignIn}
       disabled={isLoading}
       className="w-full flex items-center justify-center bg-white text-gray-700 font-semibold py-2 px-4 rounded-full border border-gray-300 hover:bg-gray-100 transition duration-300 ease-in-out disabled:opacity-70"
+      type="button"
     >
       {isLoading ? (
         <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500 mr-2"></div>
