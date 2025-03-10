@@ -1,5 +1,8 @@
+'use client';
+
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
+import AuthWrapper from "../components/AuthWrapper";
 
 export const metadata = {
   title: "Social Media App",
@@ -14,7 +17,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-gray-50">
-        {children}
+        <AuthWrapper>
+          {children}
+        </AuthWrapper>
         <Toaster position="bottom-center" />
       </body>
     </html>

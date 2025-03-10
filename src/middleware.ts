@@ -5,6 +5,16 @@ export function middleware(request: NextRequest) {
   // Get the pathname of the request
   const path = request.nextUrl.pathname;
 
+  // TEMPORARY: Authentication bypass - all routes are accessible without login
+  // Only redirect from login page to home if someone tries to access login directly
+  if (path === '/login') {
+    return NextResponse.redirect(new URL('/home', request.url));
+  }
+
+  // Continue with the request for all other paths
+  return NextResponse.next();
+
+  /* ORIGINAL AUTHENTICATION LOGIC - COMMENTED OUT TEMPORARILY
   // Define public paths that don't require authentication
   const isPublicPath = path === '/' ||
                        path === '/login' || 
@@ -28,6 +38,7 @@ export function middleware(request: NextRequest) {
 
   // Continue with the request
   return NextResponse.next();
+  */
 }
 
 // See "Matching Paths" below to learn more

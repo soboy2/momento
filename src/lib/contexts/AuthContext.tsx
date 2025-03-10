@@ -7,6 +7,41 @@ import { auth } from "../firebase/firebase";
 import { signInWithGoogle as firebaseSignInWithGoogle, logoutUser as firebaseSignOut } from "../firebase/firebaseUtils";
 import { toast } from 'react-hot-toast';
 
+// Mock user for bypassing authentication
+const MOCK_USER = {
+  uid: 'mock-user-123',
+  email: 'demo@example.com',
+  displayName: 'Demo User',
+  photoURL: 'https://ui-avatars.com/api/?name=Demo+User&background=random&size=128',
+  emailVerified: true,
+  isAnonymous: false,
+  metadata: {
+    creationTime: new Date().toISOString(),
+    lastSignInTime: new Date().toISOString()
+  },
+  providerData: [{
+    providerId: 'google.com',
+    uid: 'mock-user-123',
+    displayName: 'Demo User',
+    email: 'demo@example.com',
+    phoneNumber: null,
+    photoURL: 'https://ui-avatars.com/api/?name=Demo+User&background=random&size=128'
+  }],
+  // Add required methods to satisfy the User interface
+  delete: async () => Promise.resolve(),
+  getIdToken: async () => Promise.resolve('mock-token'),
+  getIdTokenResult: async () => Promise.resolve({
+    token: 'mock-token',
+    signInProvider: 'google.com',
+    expirationTime: new Date(Date.now() + 3600000).toISOString(),
+    issuedAtTime: new Date().toISOString(),
+    authTime: new Date().toISOString(),
+    claims: {}
+  }),
+  reload: async () => Promise.resolve(),
+  toJSON: () => ({})
+} as unknown as User;
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -26,12 +61,23 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  // TEMPORARY: Initialize with mock user instead of null
+  const [user, setUser] = useState<User | null>(MOCK_USER);
+  const [loading, setLoading] = useState(false); // Set loading to false immediately
   const [authError, setAuthError] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // Check for redirect result when the component mounts
+  // TEMPORARY: Set auth cookie on mount to bypass authentication checks
+  useEffect(() => {
+    Cookies.set('auth', 'authenticated', { expires: 7 });
+    
+    // Return cleanup function
+    return () => {
+      // No cleanup needed for temporary mock
+    };
+  }, []);
+
+  /* ORIGINAL AUTH CODE - COMMENTED OUT TEMPORARILY
   useEffect(() => {
     let isMounted = true;
     
@@ -98,64 +144,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubscribe();
     };
   }, []);
+  */
   
-  // Use useCallback to memoize the function and prevent unnecessary re-renders
+  // TEMPORARY: Mock sign-in function that always succeeds
   const signInWithGoogle = useCallback(async () => {
     try {
-      setAuthError(null);
-      setIsRedirecting(true);
-      const result = await firebaseSignInWithGoogle();
-      
-      if (!result.success) {
-        const error = result.error;
-        console.error("Error signing in with Google:", error);
-        
-        // Set the error message
-        if (error.code === 'auth/unauthorized-domain') {
-          const domain = window.location.hostname;
-          setAuthError(`This domain (${domain}) is not authorized for Firebase authentication. Please add it to your Firebase console.`);
-          
-          // Redirect to login page with error
-          if (window.location.pathname !== '/login') {
-            window.location.href = `/login?error=${encodeURIComponent('Authentication failed: Unauthorized domain')}`;
-          }
-        } else if (error.code === 'auth/popup-closed-by-user') {
-          // This is a normal case, just show a gentle reminder
-          toast.error('Sign-in popup was closed before completing the sign-in process.');
-        } else if (error.code === 'auth/popup-blocked') {
-          toast.error('Sign-in popup was blocked by the browser. Please allow popups for this site.');
-        } else {
-          setAuthError(error.message || 'Authentication failed');
-        }
-        
-        throw error;
-      }
-      
-      // If we're redirecting, show a loading message
-      if (result.redirecting) {
-        toast.loading('Redirecting to Google sign-in...');
-      }
+      // Set mock user and auth cookie
+      setUser(MOCK_USER);
+      Cookies.set('auth', 'authenticated', { expires: 7 });
+      toast.success('Successfully signed in as Demo User!');
+      return Promise.resolve();
     } catch (error: any) {
-      // This will catch any other errors that might occur
-      console.error("Unexpected error during sign in:", error);
-      setAuthError(error.message || 'An unexpected error occurred');
-      throw error;
-    } finally {
-      setIsRedirecting(false);
+      console.error("Mock sign-in error:", error);
+      return Promise.reject(error);
     }
   }, []);
 
-  // Use useCallback to memoize the function and prevent unnecessary re-renders
+  // TEMPORARY: Mock sign-out function
   const signOutUser = useCallback(async () => {
     try {
-      await firebaseSignOut();
-      // Remove auth cookie
-      Cookies.remove('auth');
-      // Clear any auth errors
-      setAuthError(null);
+      // Don't actually sign out, just show a toast
+      toast.success('Sign out clicked (but keeping you signed in for demo)');
+      return Promise.resolve();
     } catch (error: any) {
-      console.error("Error signing out:", error);
-      toast.error('Failed to sign out. Please try again.');
+      console.error("Mock sign-out error:", error);
+      return Promise.reject(error);
     }
   }, []);
 

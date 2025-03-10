@@ -4,15 +4,14 @@ import { useAuth } from '../../lib/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import SignInWithGoogle from '../../components/SignInWithGoogle';
-import { AuthProvider } from '../../lib/contexts/AuthContext';
 import { Toaster } from 'react-hot-toast';
 
 export default function LoginPage() {
   return (
-    <AuthProvider>
+    <>
       <LoginContent />
       <Toaster position="bottom-center" />
-    </AuthProvider>
+    </>
   );
 }
 
