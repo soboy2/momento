@@ -4,6 +4,11 @@ import {
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  browserPopupRedirectResolver,
+  browserLocalPersistence,
+  setPersistence,
 } from "firebase/auth";
 import {
   collection,
@@ -338,6 +343,9 @@ export const logoutUser = async () => {
 
 export const signInWithGoogle = async () => {
   try {
+    // Set persistence to local to ensure the user stays signed in
+    await setPersistence(auth, browserLocalPersistence);
+    
     const provider = new GoogleAuthProvider();
     
     // Add scopes if needed
@@ -349,32 +357,65 @@ export const signInWithGoogle = async () => {
       prompt: 'select_account'
     });
     
-    // Try to sign in
-    const result = await signInWithPopup(auth, provider);
-    
-    // If successful, check if the user exists in the userProfiles collection
-    // If not, create a new profile
+    // Try to sign in with popup first
     try {
-      const userProfileRef = doc(db, 'userProfiles', result.user.uid);
-      const userProfileSnap = await getDoc(userProfileRef);
+      const result = await signInWithPopup(auth, provider);
       
-      if (!userProfileSnap.exists()) {
-        // Create a new user profile
-        await setDoc(userProfileRef, {
-          uid: result.user.uid,
-          displayName: result.user.displayName || 'Anonymous',
-          email: result.user.email,
-          photoURL: result.user.photoURL,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
+      // If successful, check if the user exists in the userProfiles collection
+      // If not, create a new profile
+      try {
+        const userProfileRef = doc(db, 'userProfiles', result.user.uid);
+        const userProfileSnap = await getDoc(userProfileRef);
+        
+        if (!userProfileSnap.exists()) {
+          // Create a new user profile
+          await setDoc(userProfileRef, {
+            uid: result.user.uid,
+            displayName: result.user.displayName || 'Anonymous',
+            email: result.user.email,
+            photoURL: result.user.photoURL,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        }
+      } catch (profileError) {
+        console.error("Error checking/creating user profile:", profileError);
+        // Continue with sign-in even if profile creation fails
       }
-    } catch (profileError) {
-      console.error("Error checking/creating user profile:", profileError);
-      // Continue with sign-in even if profile creation fails
+      
+      return { success: true, user: result.user };
+    } catch (popupError: any) {
+      console.log("Popup sign-in failed, trying redirect method:", popupError.code);
+      
+      // If popup fails with specific errors, try redirect method
+      if (
+        popupError.code === 'auth/popup-closed-by-user' || 
+        popupError.code === 'auth/popup-blocked' ||
+        popupError.code === 'auth/cancelled-popup-request'
+      ) {
+        // Check if we're already handling a redirect
+        try {
+          // Try to get redirect result first in case we're returning from a redirect
+          const redirectResult = await getRedirectResult(auth, browserPopupRedirectResolver);
+          
+          if (redirectResult) {
+            // We have a redirect result, use it
+            return { success: true, user: redirectResult.user };
+          } else {
+            // No redirect result, initiate a redirect
+            await signInWithRedirect(auth, provider);
+            // This line won't be reached immediately as the page will redirect
+            return { success: true, redirecting: true };
+          }
+        } catch (redirectError: any) {
+          console.error("Redirect sign-in failed:", redirectError);
+          return { success: false, error: redirectError };
+        }
+      } else {
+        // For other errors, just return the original error
+        return { success: false, error: popupError };
+      }
     }
-    
-    return { success: true, user: result.user };
   } catch (error: any) {
     console.error("Error signing in with Google:", error);
     
