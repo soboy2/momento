@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Heart, MessageCircle, Send, MapPin, Tag, Calendar, Edit, Trash2 } from 'lucide-react';
@@ -10,6 +10,8 @@ import { updateDocument, deleteDocument, getDocument } from '../lib/firebase/fir
 import { useRouter } from 'next/navigation';
 import ConfirmationModal from './ConfirmationModal';
 import { toast } from 'react-hot-toast';
+import { getTrendingLevel } from '../lib/utils/trendingUtils';
+import TrendingIndicator from './TrendingIndicator';
 
 interface Comment {
   id: string;
@@ -45,6 +47,7 @@ interface PostProps {
     eventName?: string;
     contextualTags?: string[];
     captureTimestamp?: string;
+    views?: number;
   };
 }
 
@@ -76,6 +79,38 @@ export default function Post({ post }: PostProps) {
   const router = useRouter();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Calculate trending level
+  const trendingLevel = getTrendingLevel(post);
+
+  // Track post views
+  useEffect(() => {
+    const incrementViewCount = async () => {
+      if (!id) return;
+      
+      try {
+        // Get current views or default to 0
+        const currentViews = post.views || 0;
+        
+        // Update the post with incremented view count
+        await updateDocument('posts', id, {
+          views: currentViews + 1
+        });
+        
+        // We don't need to update local state since this is just for analytics
+      } catch (error) {
+        console.error('Error incrementing view count:', error);
+        // Fail silently - view count is not critical
+      }
+    };
+    
+    // Only increment view count once per session for each post
+    const viewedPosts = JSON.parse(sessionStorage.getItem('viewedPosts') || '[]');
+    if (!viewedPosts.includes(id)) {
+      incrementViewCount();
+      sessionStorage.setItem('viewedPosts', JSON.stringify([...viewedPosts, id]));
+    }
+  }, [id, post.views]);
 
   const handleLike = async () => {
     if (!user) return;
@@ -173,7 +208,12 @@ export default function Post({ post }: PostProps) {
           )}
         </div>
         <div className="ml-3 flex-1">
-          <p className="font-medium">{userName}</p>
+          <div className="flex items-center">
+            <p className="font-medium">{userName}</p>
+            {trendingLevel > 0 && (
+              <TrendingIndicator level={trendingLevel} className="ml-2" />
+            )}
+          </div>
           <p className="text-xs text-gray-500">
             {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}
           </p>
