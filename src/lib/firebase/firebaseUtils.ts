@@ -339,10 +339,52 @@ export const logoutUser = async () => {
 export const signInWithGoogle = async () => {
   try {
     const provider = new GoogleAuthProvider();
+    
+    // Add scopes if needed
+    provider.addScope('profile');
+    provider.addScope('email');
+    
+    // Set custom parameters
+    provider.setCustomParameters({
+      prompt: 'select_account'
+    });
+    
+    // Try to sign in
     const result = await signInWithPopup(auth, provider);
+    
+    // If successful, check if the user exists in the userProfiles collection
+    // If not, create a new profile
+    try {
+      const userProfileRef = doc(db, 'userProfiles', result.user.uid);
+      const userProfileSnap = await getDoc(userProfileRef);
+      
+      if (!userProfileSnap.exists()) {
+        // Create a new user profile
+        await setDoc(userProfileRef, {
+          uid: result.user.uid,
+          displayName: result.user.displayName || 'Anonymous',
+          email: result.user.email,
+          photoURL: result.user.photoURL,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (profileError) {
+      console.error("Error checking/creating user profile:", profileError);
+      // Continue with sign-in even if profile creation fails
+    }
+    
     return { success: true, user: result.user };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error signing in with Google:", error);
+    
+    // Log detailed error information for debugging
+    if (error.code === 'auth/unauthorized-domain') {
+      console.error("Unauthorized domain. Please add this domain to your Firebase authorized domains list.");
+      console.error("Current domain:", window.location.hostname);
+    }
+    
+    // Return error information
     return { success: false, error };
   }
 };
